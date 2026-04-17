@@ -1024,7 +1024,7 @@ internal sealed class HeaderBar : Control
         g.DrawString(Strings.AppTitle, tf, tb, new PointF(18, 16));
 
         // Version tag pill
-        const string ver = "v1.0";
+        const string ver = "v1.1";
         using var vf   = new Font("Segoe UI", 7.5f, FontStyle.Bold);
         float vw = g.MeasureString(ver, vf).Width + 10;
         float vx = 18 + g.MeasureString(Strings.AppTitle, tf).Width + 8;

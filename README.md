@@ -17,7 +17,8 @@ A lightweight Windows 11 utility to instantly switch your audio output between *
 - 🔔 System tray icon showing current state
 - 📋 Lists all available audio output devices
 - 🚀 Auto-start with Windows (no UAC prompt on login)
-- 🌙 Dark UI
+- 🎨 Modern dark UI with outline card style
+- 🔊 Custom speaker icon
 
 ---
 
