@@ -39,7 +39,7 @@ Download `MonoStereoToggle.exe` — no installation required.
 ## Usage
 
 1. Run `MonoStereoToggle.exe` — administrator privileges are requested once on launch
-2. Click the button to toggle between **ESTÉREO** and **MONO**
+2. Click the button to toggle between **STEREO** and **MONO**
 3. Optionally set a global keyboard shortcut and enable auto-start with Windows
 
 ---
