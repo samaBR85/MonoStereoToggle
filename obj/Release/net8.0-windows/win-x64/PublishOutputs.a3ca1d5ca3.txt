@@ -1,2 +1,0 @@
-D:\Claude Code\MonoStereoToggle\publish\MonoStereoToggle.pdb
-D:\Claude Code\MonoStereoToggle\publish\MonoStereoToggle.exe
