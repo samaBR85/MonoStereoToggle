@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Drawing.Drawing2D;
+using System.Drawing.Text;
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
 
@@ -24,7 +25,6 @@ public sealed class MainForm : Form
     [DllImport("user32.dll")]
     private static extern bool DestroyIcon(IntPtr hIcon);
 
-    // ── Global hotkey ─────────────────────────────────────────────────────────
     [DllImport("user32.dll")]
     private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
 
@@ -49,7 +49,7 @@ public sealed class MainForm : Form
     private const uint MOD_WIN      = 0x0008;
     private const uint MOD_NOREPEAT = 0x4000;
     private const uint WM_HOTKEY    = 0x0312;
-    private const int  HOTKEY_ID    = 0x4D53; // arbitrary non-zero ID
+    private const int  HOTKEY_ID    = 0x4D53;
 
     // ─── Core Audio COM ───────────────────────────────────────────────────────
 
@@ -132,21 +132,30 @@ public sealed class MainForm : Form
     private const string APP_KEY    = @"SOFTWARE\MonoStereoToggle";
     private const string APP_NAME   = "MonoStereoToggle";
 
+    // ─── Design tokens ────────────────────────────────────────────────────────
+
+    internal static readonly Color CBg       = Color.FromArgb(12,  12,  16);
+    internal static readonly Color CCard     = Color.FromArgb(22,  22,  30);
+    internal static readonly Color CBorder   = Color.FromArgb(50,  50,  70);
+    internal static readonly Color CAccentB  = Color.FromArgb(74, 158, 255);   // MONO
+    internal static readonly Color CAccentG  = Color.FromArgb(45, 210, 140);   // STEREO
+    internal static readonly Color CText     = Color.FromArgb(215, 215, 230);
+    internal static readonly Color CMuted    = Color.FromArgb(90,  90, 110);
+    internal static readonly Color CDim      = Color.FromArgb(48,  48,  62);
+
     // ─── State ────────────────────────────────────────────────────────────────
 
-    private bool _isMono;           // mirrors registry AccessibilityMonoMixState
-    private bool _busy;             // prevent double-click during service restart
+    private bool _isMono;
+    private bool _busy;
     private readonly bool _startHidden;
     private bool _initialShowDone;
     private bool _exitRequested;
 
-    // Hotkey
     private bool _recordingHotkey;
     private uint _hotkeyModifiers;
     private uint _hotkeyVk;
     private bool _hotkeyRegistered;
 
-    // Overlay
     private OverlayForm? _overlay;
 
     // ─── Controls ─────────────────────────────────────────────────────────────
@@ -155,15 +164,14 @@ public sealed class MainForm : Form
     private readonly ContextMenuStrip  _trayMenu;
     private readonly ToolStripMenuItem _trayToggleItem;
     private readonly Button            _btnToggle;
-    private readonly Label             _lblStatus;
+    private readonly Label             _lblWait;
     private readonly ListBox           _listDevices;
-    private readonly CheckBox          _chkStartup;
-    private readonly CheckBox          _chkTray;
-    private readonly TextBox           _txtHotkey;
-    private readonly Button            _btnSetHotkey;
-    private readonly Button            _btnClearHotkey;
+    private readonly ToggleSwitch      _chkStartup;
+    private readonly ToggleSwitch      _chkTray;
+    private readonly HotkeyBox        _hotkeyBox;
     private readonly Icon              _iconMono;
     private readonly Icon              _iconStereo;
+    private readonly Icon              _iconApp;
 
     private List<AudioDevice> _devices = new();
 
@@ -171,202 +179,176 @@ public sealed class MainForm : Form
 
     public MainForm(bool startHidden)
     {
-        // ── Read current system state from registry ───────────────────────────
         _isMono      = RegGet<int>(AUDIO_KEY, MONO_VALUE) == 1;
         _startHidden = startHidden || RegGet<int>(APP_KEY, "StartInTray") == 1;
 
-        _iconMono   = MakeIcon(Color.FromArgb(0, 103, 192), "M");
-        _iconStereo = MakeIcon(Color.FromArgb(75, 75, 75),  "S");
+        _iconMono   = MakeIcon(CAccentB, "M");
+        _iconStereo = MakeIcon(CAccentG, "S");
+        _iconApp    = MakeAppIcon();
+        Icon        = _iconApp;
 
         // ── Form ──────────────────────────────────────────────────────────────
         Text            = APP_NAME;
-        Size            = new Size(390, 530);
-        MinimumSize     = new Size(340, 480);   // resizable but not too small
+        Size            = new Size(400, 580);
+        MinimumSize     = new Size(340, 500);
         FormBorderStyle = FormBorderStyle.Sizable;
         MaximizeBox     = true;
         StartPosition   = FormStartPosition.CenterScreen;
-        BackColor       = Color.FromArgb(28, 28, 28);
-        ForeColor       = Color.White;
+        BackColor       = CBg;
+        ForeColor       = CText;
         Font            = new Font("Segoe UI", 10f);
 
-        // ── Title ─────────────────────────────────────────────────────────────
-        var lblTitle = MkLabel(Strings.AppTitle,
-            new Font(new FontFamily("Segoe UI Light"), 16f), Color.White, new Point(20, 16));
-        lblTitle.Anchor = AnchorStyles.Top | AnchorStyles.Left;
-        Controls.Add(lblTitle);
-
-        // ── Status ────────────────────────────────────────────────────────────
-        _lblStatus = MkLabel("", new Font("Segoe UI", 9f),
-            Color.FromArgb(140, 140, 140), new Point(22, 54));
-        _lblStatus.Anchor = AnchorStyles.Top | AnchorStyles.Left;
-        Controls.Add(_lblStatus);
+        // ── Header bar ────────────────────────────────────────────────────────
+        var header = new HeaderBar { Dock = DockStyle.Top, Height = 54 };
+        Controls.Add(header);
 
         // ── Toggle button ─────────────────────────────────────────────────────
         _btnToggle = new Button
         {
-            Location = new Point(20, 76),
-            Size     = new Size(ClientSize.Width - 40, 88),
-            Anchor   = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+            Location  = new Point(16, 62),
+            Size      = new Size(ClientSize.Width - 32, 100),
+            Anchor    = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
             FlatStyle = FlatStyle.Flat,
-            Font      = new Font("Segoe UI", 24f, FontStyle.Bold),
-            ForeColor = Color.White,
             Cursor    = Cursors.Hand,
-            UseVisualStyleBackColor = false
+            UseVisualStyleBackColor = false,
+            BackColor = Color.Transparent,
+            TabStop   = false,
         };
         _btnToggle.FlatAppearance.BorderSize         = 0;
         _btnToggle.FlatAppearance.MouseOverBackColor = Color.Transparent;
         _btnToggle.FlatAppearance.MouseDownBackColor = Color.Transparent;
-        _btnToggle.Paint     += PaintButton;
-        _btnToggle.Click     += (_, _) => ForceToggle();
-        _btnToggle.SizeChanged += (_, _) => RoundRegion(_btnToggle, 10);
-        RoundRegion(_btnToggle, 10);
+        _btnToggle.Paint  += PaintToggleButton;
+        _btnToggle.Click  += (_, _) => ForceToggle();
         Controls.Add(_btnToggle);
 
-        // ── Separator 1 ───────────────────────────────────────────────────────
-        var sep1 = new Panel
+        // ── Wait label (shown during toggle) ─────────────────────────────────
+        _lblWait = new Label
         {
-            Location  = new Point(20, 178),
-            Size      = new Size(ClientSize.Width - 40, 1),
-            Anchor    = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
-            BackColor = Color.FromArgb(52, 52, 52)
+            Text      = Strings.StatusWait,
+            Font      = new Font("Segoe UI", 9f),
+            ForeColor = Color.FromArgb(255, 190, 50),
+            BackColor = Color.Transparent,
+            AutoSize  = true,
+            Visible   = false,
+            Anchor    = AnchorStyles.Top | AnchorStyles.Left,
         };
-        Controls.Add(sep1);
+        Controls.Add(_lblWait);
+        _lblWait.Location = new Point(18, 170);
 
-        // ── Devices label ─────────────────────────────────────────────────────
-        var lblDev = MkLabel(Strings.DevicesLabel,
-            new Font("Segoe UI", 8.5f), Color.FromArgb(160, 160, 160), new Point(20, 188));
-        lblDev.Anchor = AnchorStyles.Top | AnchorStyles.Left;
-        Controls.Add(lblDev);
+        // ── Devices section ───────────────────────────────────────────────────
+        var sectionDevices = new SectionLabel(Strings.DevicesLabel)
+        {
+            Location = new Point(16, 180),
+            Size     = new Size(ClientSize.Width - 32, 20),
+            Anchor   = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+        };
+        Controls.Add(sectionDevices);
 
-        // ── Device list ───────────────────────────────────────────────────────
+        var devCard = new CardPanel
+        {
+            Location = new Point(16, 204),
+            Size     = new Size(ClientSize.Width - 32, ClientSize.Height - 404),
+            Anchor   = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
+        };
+        Controls.Add(devCard);
+
         _listDevices = new ListBox
         {
-            Location      = new Point(20, 208),
-            Size          = new Size(ClientSize.Width - 40, ClientSize.Height - 408),
+            Location      = new Point(1, 1),
+            Size          = new Size(devCard.Width - 2, devCard.Height - 2),
             Anchor        = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
-            BackColor     = Color.FromArgb(38, 38, 38),
-            ForeColor     = Color.FromArgb(210, 210, 210),
-            BorderStyle   = BorderStyle.FixedSingle,
+            BackColor     = Color.FromArgb(18, 18, 26),
+            ForeColor     = CText,
+            BorderStyle   = BorderStyle.None,
             Font          = new Font("Segoe UI", 9f),
             SelectionMode = SelectionMode.None,
             DrawMode      = DrawMode.OwnerDrawFixed,
-            ItemHeight    = 24
+            ItemHeight    = 28,
         };
         _listDevices.DrawItem += DrawDeviceItem;
-        Controls.Add(_listDevices);
+        devCard.Controls.Add(_listDevices);
 
         // ── Device hint ───────────────────────────────────────────────────────
-        var lblDeviceHint = MkLabel(Strings.DeviceHint,
-            new Font("Segoe UI", 7.5f), Color.FromArgb(80, 80, 80),
-            new Point(20, ClientSize.Height - 218));
-        lblDeviceHint.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
-        Controls.Add(lblDeviceHint);
-
-        // ── Separator 2 ───────────────────────────────────────────────────────
-        var sep2 = new Panel
+        var lblHint = new Label
         {
-            Location  = new Point(20, ClientSize.Height - 200),
-            Size      = new Size(ClientSize.Width - 40, 1),
-            Anchor    = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
-            BackColor = Color.FromArgb(52, 52, 52)
+            Text      = Strings.DeviceHint,
+            Font      = new Font("Segoe UI", 7.5f),
+            ForeColor = Color.FromArgb(52, 52, 66),
+            BackColor = Color.Transparent,
+            AutoSize  = true,
+            Location  = new Point(18, ClientSize.Height - 214),
+            Anchor    = AnchorStyles.Bottom | AnchorStyles.Left,
         };
-        Controls.Add(sep2);
+        Controls.Add(lblHint);
 
-        // ── Startup checkbox ──────────────────────────────────────────────────
-        _chkStartup = MkCheckBox(Strings.ChkStartup,
-            new Point(20, ClientSize.Height - 186),
-            IsStartupTaskRegistered());
-        _chkStartup.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+        // ── Settings card ─────────────────────────────────────────────────────
+        var settingsCard = new CardPanel
+        {
+            Location = new Point(16, ClientSize.Height - 198),
+            Size     = new Size(ClientSize.Width - 32, 170),
+            Anchor   = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
+        };
+        Controls.Add(settingsCard);
+
+        // Startup toggle row
+        var rowStartup = new ToggleRow(Strings.ChkStartup, IsStartupTaskRegistered());
+        rowStartup.Location = new Point(0, 0);
+        rowStartup.Size     = new Size(settingsCard.Width, 46);
+        rowStartup.Anchor   = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+        settingsCard.Controls.Add(rowStartup);
+        _chkStartup = rowStartup.Toggle;
         _chkStartup.CheckedChanged += (_, _) => ApplyStartup(_chkStartup.Checked);
-        Controls.Add(_chkStartup);
 
-        // ── Tray checkbox ─────────────────────────────────────────────────────
-        _chkTray = MkCheckBox(Strings.ChkTray,
-            new Point(20, ClientSize.Height - 154),
-            RegGet<int>(APP_KEY, "StartInTray") == 1);
-        _chkTray.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
-        _chkTray.CheckedChanged += (_, _) =>
-            RegSet(APP_KEY, "StartInTray", _chkTray.Checked ? 1 : 0);
-        Controls.Add(_chkTray);
+        // Thin divider
+        var div1 = new DividerLine { Location = new Point(16, 46), Size = new Size(settingsCard.Width - 32, 1) };
+        div1.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+        settingsCard.Controls.Add(div1);
 
-        // ── Separator 3 ───────────────────────────────────────────────────────
-        var sep3 = new Panel
+        // Tray toggle row
+        var rowTray = new ToggleRow(Strings.ChkTray, RegGet<int>(APP_KEY, "StartInTray") == 1);
+        rowTray.Location = new Point(0, 47);
+        rowTray.Size     = new Size(settingsCard.Width, 46);
+        rowTray.Anchor   = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+        settingsCard.Controls.Add(rowTray);
+        _chkTray = rowTray.Toggle;
+        _chkTray.CheckedChanged += (_, _) => RegSet(APP_KEY, "StartInTray", _chkTray.Checked ? 1 : 0);
+
+        // Thin divider
+        var div2 = new DividerLine { Location = new Point(16, 93), Size = new Size(settingsCard.Width - 32, 1) };
+        div2.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+        settingsCard.Controls.Add(div2);
+
+        // Hotkey row
+        _hotkeyBox = new HotkeyBox
         {
-            Location  = new Point(20, ClientSize.Height - 122),
-            Size      = new Size(ClientSize.Width - 40, 1),
-            Anchor    = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
-            BackColor = Color.FromArgb(52, 52, 52)
+            Location = new Point(0, 94),
+            Size     = new Size(settingsCard.Width, 46),
+            Anchor   = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
         };
-        Controls.Add(sep3);
-
-        // ── Hotkey row ────────────────────────────────────────────────────────
-        var lblHk = MkLabel(Strings.HotkeyLabel, new Font("Segoe UI", 9f),
-            Color.FromArgb(160, 160, 160), new Point(20, ClientSize.Height - 103));
-        lblHk.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
-        Controls.Add(lblHk);
-
-        _txtHotkey = new TextBox
-        {
-            Location  = new Point(74, ClientSize.Height - 106),
-            Size      = new Size(ClientSize.Width - 234, 23),
-            Anchor    = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
-            ReadOnly  = true,
-            BackColor = Color.FromArgb(38, 38, 38),
-            ForeColor = Color.FromArgb(200, 200, 200),
-            Font      = new Font("Segoe UI", 9f),
-            BorderStyle = BorderStyle.FixedSingle,
-            Text      = Strings.HotkeyNone,
-            Cursor    = Cursors.Default,
-            TabStop   = false
-        };
-        Controls.Add(_txtHotkey);
-
-        _btnSetHotkey = new Button
-        {
-            Location  = new Point(ClientSize.Width - 156, ClientSize.Height - 108),
-            Size      = new Size(68, 26),
-            Anchor    = AnchorStyles.Bottom | AnchorStyles.Right,
-            Text      = Strings.HotkeySet,
-            FlatStyle = FlatStyle.Flat,
-            Font      = new Font("Segoe UI", 8.5f),
-            ForeColor = Color.FromArgb(200, 200, 200),
-            BackColor = Color.FromArgb(52, 52, 52),
-            Cursor    = Cursors.Hand,
-        };
-        _btnSetHotkey.FlatAppearance.BorderColor = Color.FromArgb(80, 80, 80);
-        _btnSetHotkey.Click += OnSetHotkeyClick;
-        Controls.Add(_btnSetHotkey);
-
-        _btnClearHotkey = new Button
-        {
-            Location  = new Point(ClientSize.Width - 84, ClientSize.Height - 108),
-            Size      = new Size(64, 26),
-            Anchor    = AnchorStyles.Bottom | AnchorStyles.Right,
-            Text      = Strings.HotkeyClear,
-            FlatStyle = FlatStyle.Flat,
-            Font      = new Font("Segoe UI", 8.5f),
-            ForeColor = Color.FromArgb(160, 80, 80),
-            BackColor = Color.FromArgb(52, 52, 52),
-            Cursor    = Cursors.Hand,
-        };
-        _btnClearHotkey.FlatAppearance.BorderColor = Color.FromArgb(80, 80, 80);
-        _btnClearHotkey.Click += (_, _) => ClearHotkey();
-        Controls.Add(_btnClearHotkey);
+        _hotkeyBox.SetClicked   += OnSetHotkeyClick;
+        _hotkeyBox.ClearClicked += (_, _) => ClearHotkey();
+        settingsCard.Controls.Add(_hotkeyBox);
 
         // ── Footer ────────────────────────────────────────────────────────────
-        var footer = MkLabel(Strings.Footer,
-            new Font("Segoe UI", 7.5f), Color.FromArgb(70, 70, 70),
-            new Point(20, ClientSize.Height - 52));
-        footer.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+        var footer = new Label
+        {
+            Text      = Strings.Footer,
+            Font      = new Font("Segoe UI", 7f),
+            ForeColor = Color.FromArgb(42, 42, 55),
+            BackColor = Color.Transparent,
+            AutoSize  = false,
+            Size      = new Size(ClientSize.Width - 36, 16),
+            Location  = new Point(18, ClientSize.Height - 26),
+            Anchor    = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
+        };
         Controls.Add(footer);
 
-        // ── Key capture setup ─────────────────────────────────────────────────
+        // ── Key capture ───────────────────────────────────────────────────────
         KeyPreview = true;
         KeyDown   += OnFormKeyDown;
 
         // ── Tray ──────────────────────────────────────────────────────────────
-        _trayToggleItem = new ToolStripMenuItem
-            { Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
+        _trayToggleItem = new ToolStripMenuItem { Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
         _trayToggleItem.Click += (_, _) => ForceToggle();
 
         _trayMenu = new ContextMenuStrip { Renderer = new DarkMenuRenderer() };
@@ -432,12 +414,12 @@ public sealed class MainForm : Form
         {
             if (_hotkeyRegistered) UnregisterHotKey(Handle, HOTKEY_ID);
             _tray.Dispose(); _trayMenu.Dispose();
-            _iconMono.Dispose(); _iconStereo.Dispose();
+            _iconMono.Dispose(); _iconStereo.Dispose(); _iconApp.Dispose();
         }
         base.Dispose(disposing);
     }
 
-    // ─── Device listing ───────────────────────────────────────────────────────
+    // ─── Devices ──────────────────────────────────────────────────────────────
 
     private record AudioDevice(string Id, string Name, bool IsDefault);
 
@@ -500,66 +482,54 @@ public sealed class MainForm : Form
         var dev  = _devices[e.Index];
         var g    = e.Graphics;
         var rect = e.Bounds;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
 
-        using (var bg = new SolidBrush(Color.FromArgb(38, 38, 38)))
+        using (var bg = new SolidBrush(Color.FromArgb(e.Index % 2 == 0 ? 18 : 21, 18, 26)))
             g.FillRectangle(bg, rect);
 
-        var dotColor = dev.IsDefault ? Color.FromArgb(0, 180, 100) : Color.FromArgb(65, 65, 65);
+        // Accent dot
+        var dotColor = dev.IsDefault ? CAccentG : CDim;
         using (var dot = new SolidBrush(dotColor))
-            g.FillEllipse(dot, rect.X + 8, rect.Y + 8, 8, 8);
+            g.FillEllipse(dot, rect.X + 12, rect.Y + 10, 8, 8);
 
-        var nameColor = dev.IsDefault ? Color.White : Color.FromArgb(155, 155, 155);
-        using var nameFont = dev.IsDefault
+        var nameColor = dev.IsDefault ? Color.White : CMuted;
+        using var nf = dev.IsDefault
             ? new Font("Segoe UI", 9f, FontStyle.Bold)
             : new Font("Segoe UI", 9f);
-        using (var nameBrush = new SolidBrush(nameColor))
-            g.DrawString(dev.Name, nameFont, nameBrush, new PointF(rect.X + 24, rect.Y + 4));
+        using (var nb = new SolidBrush(nameColor))
+            g.DrawString(dev.Name, nf, nb, new PointF(rect.X + 28, rect.Y + 5));
 
         if (dev.IsDefault)
         {
-            var tw = g.MeasureString(dev.Name, nameFont).Width;
-            using var tagFont  = new Font("Segoe UI", 7.5f);
-            using var tagBrush = new SolidBrush(Color.FromArgb(0, 150, 80));
-            g.DrawString(Strings.DeviceDefault, tagFont, tagBrush,
-                new PointF(rect.X + 24 + tw + 4, rect.Y + 6));
+            float tw = g.MeasureString(dev.Name, nf).Width;
+            using var tf = new Font("Segoe UI", 7.5f);
+            using var tb = new SolidBrush(CAccentG);
+            g.DrawString(Strings.DeviceDefault, tf, tb, new PointF(rect.X + 28 + tw + 4, rect.Y + 7));
         }
 
-        using var divider = new Pen(Color.FromArgb(50, 50, 50));
-        g.DrawLine(divider, rect.Left, rect.Bottom - 1, rect.Right, rect.Bottom - 1);
+        using var div = new Pen(Color.FromArgb(28, 28, 38));
+        g.DrawLine(div, rect.Left, rect.Bottom - 1, rect.Right, rect.Bottom - 1);
     }
 
     // ─── Toggle ───────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Toggle audio mode. The app already runs as admin (manifest), so the
-    /// service restart happens silently on a background thread — zero prompts.
-    /// </summary>
     private void ForceToggle()
     {
         if (_busy) return;
         _busy = true;
         _btnToggle.Enabled = false;
+        _lblWait.Visible   = true;
+        _btnToggle.Invalidate();
 
         bool newState = !_isMono;
 
-        _lblStatus.Text      = Strings.StatusWait;
-        _lblStatus.ForeColor = Color.FromArgb(255, 190, 50);
-        _btnToggle.Text      = "…";
-        _btnToggle.Invalidate();
-
-        // !! Everything runs on background thread — UI thread never blocks !!
         System.Threading.Tasks.Task.Run(() =>
         {
             try
             {
-                // Write registry in background (WM_SETTINGCHANGE can take 500 ms+)
                 WriteRegistryState(newState);
-
-                // Kill audiodg.exe first — helps audiosrv stop faster by removing
-                // the child APO host before the graceful shutdown sequence.
                 TryKillAudioDG();
-
-                // Full audiosrv restart — only confirmed method to apply mono.
                 RestartAudioService();
 
                 Invoke(() =>
@@ -568,31 +538,26 @@ public sealed class MainForm : Form
                     LoadDevices();
                     ApplyState();
                     _btnToggle.Enabled = true;
+                    _lblWait.Visible   = false;
                     _busy = false;
                     ShowOverlay(newState);
                 });
             }
             catch (Exception ex)
             {
-                WriteRegistryState(!newState); // revert
+                WriteRegistryState(!newState);
                 Invoke(() =>
                 {
                     MessageBox.Show($"{Strings.ErrorPrefix}\n{ex.Message}", APP_NAME);
                     ApplyState();
                     _btnToggle.Enabled = true;
+                    _lblWait.Visible   = false;
                     _busy = false;
                 });
             }
         });
     }
 
-    /// <summary>
-    /// Kills audiodg.exe — the child APO host process of audiosrv.
-    /// audiosrv automatically relaunches it within ~500 ms, re-reading
-    /// the registry (including the mono setting) on the way back up.
-    /// Much faster than a full audiosrv restart (~5 s).
-    /// Returns true if at least one audiodg process was found and killed.
-    /// </summary>
     private static bool TryKillAudioDG()
     {
         try
@@ -601,46 +566,30 @@ public sealed class MainForm : Form
             if (procs.Length == 0) return false;
             foreach (var p in procs)
             {
-                try { p.Kill(); } catch { /* may already be gone */ }
+                try { p.Kill(); } catch { }
                 finally { p.Dispose(); }
             }
-            // Wait for audiosrv to relaunch the child and settle
             Thread.Sleep(700);
             return true;
         }
         catch { return false; }
     }
 
-    /// <summary>
-    /// Restarts audiosrv using ServiceController with tight 100 ms polling —
-    /// faster than spawning cmd.exe with "net stop/start".
-    /// </summary>
     private static void RestartAudioService()
     {
         using var sc = new System.ServiceProcess.ServiceController("audiosrv");
-
         if (sc.Status == System.ServiceProcess.ServiceControllerStatus.Running)
         {
             sc.Stop();
-            var deadline = DateTime.UtcNow.AddSeconds(10);
-            while (sc.Status != System.ServiceProcess.ServiceControllerStatus.Stopped
-                   && DateTime.UtcNow < deadline)
-            {
-                Thread.Sleep(50);   // tighter polling — detect stop ASAP
-                sc.Refresh();
-            }
+            var d = DateTime.UtcNow.AddSeconds(10);
+            while (sc.Status != System.ServiceProcess.ServiceControllerStatus.Stopped && DateTime.UtcNow < d)
+            { Thread.Sleep(50); sc.Refresh(); }
         }
-
         sc.Start();
-        var startDeadline = DateTime.UtcNow.AddSeconds(10);
-        while (sc.Status != System.ServiceProcess.ServiceControllerStatus.Running
-               && DateTime.UtcNow < startDeadline)
-        {
-            Thread.Sleep(50);   // tighter polling — detect running ASAP
-            sc.Refresh();
-        }
-
-        Thread.Sleep(200); // minimal settle — audio sessions reconnect quickly
+        var d2 = DateTime.UtcNow.AddSeconds(10);
+        while (sc.Status != System.ServiceProcess.ServiceControllerStatus.Running && DateTime.UtcNow < d2)
+        { Thread.Sleep(50); sc.Refresh(); }
+        Thread.Sleep(200);
     }
 
     // ─── Hotkey ───────────────────────────────────────────────────────────────
@@ -649,31 +598,21 @@ public sealed class MainForm : Form
     {
         if (_recordingHotkey) { CancelHotkeyRecording(); return; }
         _recordingHotkey = true;
-        _btnSetHotkey.Text      = Strings.HotkeyRecording;
-        _btnSetHotkey.ForeColor = Color.FromArgb(255, 190, 50);
-        _txtHotkey.Text         = Strings.HotkeyPrompt;
-        _txtHotkey.BackColor   = Color.FromArgb(45, 42, 28);
+        _hotkeyBox.StartRecording();
     }
 
     private void OnFormKeyDown(object? sender, KeyEventArgs e)
     {
         if (!_recordingHotkey) return;
-
-        // Ignore lone modifier keys — wait for a real key
-        if (e.KeyCode is Keys.ControlKey or Keys.ShiftKey or Keys.Menu
-                      or Keys.LWin or Keys.RWin or Keys.None)
+        if (e.KeyCode is Keys.ControlKey or Keys.ShiftKey or Keys.Menu or Keys.LWin or Keys.RWin or Keys.None)
             return;
-
         if (e.KeyCode == Keys.Escape) { CancelHotkeyRecording(); e.Handled = true; return; }
-
-        // Require at least one modifier
         if (!e.Control && !e.Alt && !e.Shift) return;
 
         uint mods = 0;
         if (e.Control) mods |= MOD_CONTROL;
         if (e.Alt)     mods |= MOD_ALT;
         if (e.Shift)   mods |= MOD_SHIFT;
-
         SetHotkey(mods, (uint)e.KeyCode);
         e.Handled = true;
         e.SuppressKeyPress = true;
@@ -685,57 +624,48 @@ public sealed class MainForm : Form
 
         if (RegisterHotKey(Handle, HOTKEY_ID, modifiers | MOD_NOREPEAT, vk))
         {
-            _hotkeyModifiers = modifiers;
-            _hotkeyVk        = vk;
+            _hotkeyModifiers  = modifiers;
+            _hotkeyVk         = vk;
             _hotkeyRegistered = true;
-            _txtHotkey.Text      = HotkeyToString(modifiers, vk);
-            _txtHotkey.BackColor = Color.FromArgb(38, 38, 38);
-
+            _hotkeyBox.SetValue(HotkeyToString(modifiers, vk), success: true);
             RegSet(APP_KEY, "HotkeyMods", (int)modifiers);
             RegSet(APP_KEY, "HotkeyVk",   (int)vk);
         }
         else
         {
-            _txtHotkey.Text      = Strings.HotkeyInUse;
-            _txtHotkey.BackColor = Color.FromArgb(60, 28, 28);
+            _hotkeyBox.SetValue(Strings.HotkeyInUse, success: false);
         }
-        _recordingHotkey        = false;
-        _btnSetHotkey.Text      = Strings.HotkeySet;
-        _btnSetHotkey.ForeColor = Color.FromArgb(200, 200, 200);
+        _recordingHotkey = false;
     }
 
     private void ClearHotkey()
     {
         if (_hotkeyRegistered) { UnregisterHotKey(Handle, HOTKEY_ID); _hotkeyRegistered = false; }
         _hotkeyModifiers = 0; _hotkeyVk = 0;
-        _txtHotkey.Text      = Strings.HotkeyNone;
-        _txtHotkey.BackColor = Color.FromArgb(38, 38, 38);
+        _hotkeyBox.SetValue(Strings.HotkeyNone, success: true);
         RegSet(APP_KEY, "HotkeyMods", 0);
         RegSet(APP_KEY, "HotkeyVk",   0);
     }
 
     private void CancelHotkeyRecording()
     {
-        _recordingHotkey        = false;
-        _btnSetHotkey.Text      = Strings.HotkeySet;
-        _btnSetHotkey.ForeColor = Color.FromArgb(200, 200, 200);
-        _txtHotkey.Text         = _hotkeyRegistered
+        _recordingHotkey = false;
+        _hotkeyBox.CancelRecording(_hotkeyRegistered
             ? HotkeyToString(_hotkeyModifiers, _hotkeyVk)
-            : Strings.HotkeyNone;
-        _txtHotkey.BackColor    = Color.FromArgb(38, 38, 38);
+            : Strings.HotkeyNone);
     }
 
     private void RegisterSavedHotkey()
     {
         var mods = (uint)RegGet<int>(APP_KEY, "HotkeyMods");
         var vk   = (uint)RegGet<int>(APP_KEY, "HotkeyVk");
-        if (vk == 0) return; // nothing saved
+        if (vk == 0) return;
         if (RegisterHotKey(Handle, HOTKEY_ID, mods | MOD_NOREPEAT, vk))
         {
             _hotkeyModifiers  = mods;
             _hotkeyVk         = vk;
             _hotkeyRegistered = true;
-            _txtHotkey.Text = HotkeyToString(mods, vk);
+            _hotkeyBox.SetValue(HotkeyToString(mods, vk), success: true);
         }
     }
 
@@ -749,8 +679,8 @@ public sealed class MainForm : Form
         var key = (Keys)vk;
         string keyName = key switch
         {
-            >= Keys.A and <= Keys.Z   => ((char)('A' + (key - Keys.A))).ToString(),
-            >= Keys.D0 and <= Keys.D9 => ((char)('0' + (key - Keys.D0))).ToString(),
+            >= Keys.A and <= Keys.Z    => ((char)('A' + (key - Keys.A))).ToString(),
+            >= Keys.D0 and <= Keys.D9  => ((char)('0' + (key - Keys.D0))).ToString(),
             >= Keys.F1 and <= Keys.F24 => $"F{key - Keys.F1 + 1}",
             >= Keys.NumPad0 and <= Keys.NumPad9 => $"Num{key - Keys.NumPad0}",
             Keys.Space    => Strings.KeySpace,
@@ -763,31 +693,20 @@ public sealed class MainForm : Form
             Keys.End      => "End",
             Keys.PageUp   => "PgUp",
             Keys.PageDown => "PgDn",
-            Keys.Up       => "↑",
-            Keys.Down     => "↓",
-            Keys.Left     => "←",
-            Keys.Right    => "→",
-            Keys.OemMinus => "-",
-            Keys.Oemplus  => "+",
-            Keys.Oemcomma => ",",
-            Keys.OemPeriod => ".",
-            _             => key.ToString()
+            Keys.Up => "↑", Keys.Down => "↓", Keys.Left => "←", Keys.Right => "→",
+            Keys.OemMinus => "-", Keys.Oemplus => "+",
+            Keys.Oemcomma => ",", Keys.OemPeriod => ".",
+            _ => key.ToString()
         };
         parts.Add(keyName);
         return string.Join(" + ", parts);
     }
 
+    // ─── Apply state ──────────────────────────────────────────────────────────
+
     private void ApplyState()
     {
-        _btnToggle.Text      = _isMono ? Strings.BtnMono : Strings.BtnStereo;
-        _btnToggle.BackColor = _isMono ? Color.FromArgb(0, 103, 192) : Color.FromArgb(58, 58, 58);
         _btnToggle.Invalidate();
-
-        _lblStatus.Text      = _isMono ? Strings.StatusMono : Strings.StatusStereo;
-        _lblStatus.ForeColor = _isMono
-            ? Color.FromArgb(90, 170, 255)
-            : Color.FromArgb(140, 140, 140);
-
         _tray.Icon           = _isMono ? _iconMono : _iconStereo;
         _tray.Text           = _isMono ? Strings.TrayMono : Strings.TrayStereo;
         _trayToggleItem.Text = _isMono ? Strings.TrayToStereo : Strings.TrayToMono;
@@ -810,7 +729,6 @@ public sealed class MainForm : Form
             if (mono) set.Add(MONO_FEAT); else set.Remove(MONO_FEAT);
             a.SetValue(CONFIG_VAL, string.Join(",", set), RegistryValueKind.String);
 
-            // Soft notification (best-effort)
             SendMessageTimeout(HWND_BROADCAST, WM_SETTINGCHANGE, UIntPtr.Zero,
                 ACCESS_KEY, SMTO_ABORTIFHUNG | SMTO_NOTIMEOUTIFHUNG, 2000, out _);
             SendMessageTimeout(HWND_BROADCAST, WM_SETTINGCHANGE, UIntPtr.Zero,
@@ -840,20 +758,14 @@ public sealed class MainForm : Form
     {
         try
         {
-            // Remove legacy registry Run entry (migration from older builds)
             using (var k = Registry.CurrentUser.OpenSubKey(RUN_KEY, writable: true))
                 k?.DeleteValue(APP_NAME, throwOnMissingValue: false);
-
             if (enable)
             {
-                // Task Scheduler with /rl HIGHEST = runs elevated at logon, zero UAC prompt
                 var tr = $"\\\"{Application.ExecutablePath}\\\" --tray";
                 RunSchtasks($"/create /tn \"{APP_NAME}\" /tr \"{tr}\" /sc ONLOGON /rl HIGHEST /f");
             }
-            else
-            {
-                RunSchtasks($"/delete /tn \"{APP_NAME}\" /f", ignoreExitCode: true);
-            }
+            else RunSchtasks($"/delete /tn \"{APP_NAME}\" /f", ignoreExitCode: true);
         }
         catch (Exception ex) { MessageBox.Show($"{Strings.StartupError}\n{ex.Message}", APP_NAME); }
     }
@@ -864,10 +776,8 @@ public sealed class MainForm : Form
         {
             using var p = Process.Start(new ProcessStartInfo
             {
-                FileName        = "schtasks.exe",
-                Arguments       = $"/query /tn \"{APP_NAME}\"",
-                UseShellExecute = false,
-                CreateNoWindow  = true
+                FileName = "schtasks.exe", Arguments = $"/query /tn \"{APP_NAME}\"",
+                UseShellExecute = false, CreateNoWindow = true
             })!;
             p.WaitForExit(3000);
             return p.ExitCode == 0;
@@ -879,13 +789,10 @@ public sealed class MainForm : Form
     {
         using var p = Process.Start(new ProcessStartInfo
         {
-            FileName               = "schtasks.exe",
-            Arguments              = args,
-            UseShellExecute        = false,
-            CreateNoWindow         = true,
-            RedirectStandardError  = true
+            FileName = "schtasks.exe", Arguments = args,
+            UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true
         })!;
-        var err = p.StandardError.ReadToEnd(); // read before WaitForExit to avoid deadlock
+        var err = p.StandardError.ReadToEnd();
         p.WaitForExit(5000);
         if (!ignoreExitCode && p.ExitCode != 0 && !string.IsNullOrWhiteSpace(err))
             throw new InvalidOperationException(err.Trim());
@@ -904,77 +811,181 @@ public sealed class MainForm : Form
         _exitRequested = true; _tray.Visible = false; Application.Exit();
     }
 
-    // ─── Button painting ──────────────────────────────────────────────────────
+    // ─── Toggle button paint ──────────────────────────────────────────────────
 
-    private void PaintButton(object? sender, PaintEventArgs e)
+    private void PaintToggleButton(object? sender, PaintEventArgs e)
     {
         var btn = (Button)sender!;
         var g   = e.Graphics;
         g.SmoothingMode     = SmoothingMode.AntiAlias;
-        g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+        g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
 
         bool hover   = btn.ClientRectangle.Contains(btn.PointToClient(Cursor.Position));
         bool pressed = hover && (MouseButtons & MouseButtons.Left) != 0;
-        Color c      = btn.BackColor;
-        if      (pressed) c = Adj(c, -30);
-        else if (hover)   c = Adj(c, +20);
 
-        using var fill = new SolidBrush(c);
-        g.FillRectangle(fill, btn.ClientRectangle);
-        using var sf = new StringFormat
-            { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-        g.DrawString(btn.Text, btn.Font, Brushes.White,
-            new RectangleF(0, 0, btn.Width, btn.Height), sf);
+        Color accent = _isMono ? CAccentB : CAccentG;
+
+        // Paint form background colour in the full rect first, so rounded
+        // corners of the card below appear to "cut into" the form surface.
+        using (var bgBrush = new SolidBrush(CBg))
+            g.FillRectangle(bgBrush, btn.ClientRectangle);
+
+        // Card fill
+        Color fill = _isMono
+            ? Color.FromArgb(pressed ? 8 : hover ? 16 : 12, 20, 40)
+            : Color.FromArgb(pressed ? 8 : hover ? 16 : 10, 28, 24);
+
+        const int r = 14;
+        using var path = RoundedPath(0, 0, btn.Width - 1, btn.Height - 1, r);
+        using (var fb = new SolidBrush(fill)) g.FillPath(fb, path);
+
+        // Border — glow on hover
+        float bw = hover ? 1.8f : 1.2f;
+        var   bc = hover ? Color.FromArgb(Math.Min(accent.R + 30, 255), Math.Min(accent.G + 30, 255), Math.Min(accent.B + 30, 255))
+                         : Color.FromArgb((int)(accent.R * 0.7f), (int)(accent.G * 0.7f), (int)(accent.B * 0.7f));
+        using (var pen = new Pen(bc, bw)) g.DrawPath(pen, path);
+
+        // ── Left badge circle ─────────────────────────────────────────────────
+        int cs  = btn.Height - 40;
+        int cx  = 22;
+        int cty = (btn.Height - cs) / 2;
+
+        // Filled badge background
+        var badgeBg = Color.FromArgb(30, accent.R, accent.G, accent.B);
+        using (var bb = new SolidBrush(badgeBg)) g.FillEllipse(bb, cx, cty, cs, cs);
+        using (var bp = new Pen(accent, 1.5f)) g.DrawEllipse(bp, cx, cty, cs, cs);
+
+        string letter = _isMono ? "M" : "S";
+        using var lf  = new Font("Segoe UI", cs * 0.50f, FontStyle.Bold, GraphicsUnit.Pixel);
+        using var lsf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+        using var lb  = new SolidBrush(accent);
+        g.DrawString(letter, lf, lb, new RectangleF(cx, cty, cs, cs), lsf);
+
+        // ── Mode label ────────────────────────────────────────────────────────
+        int tx  = cx + cs + 20;
+        int mid = btn.Height / 2;
+
+        using var mf = new Font("Segoe UI", 24f, FontStyle.Bold, GraphicsUnit.Pixel);
+        using var mb = new SolidBrush(accent);
+        g.DrawString(_isMono ? Strings.BtnMono : Strings.BtnStereo, mf, mb, new PointF(tx, mid - 17));
+
+        // ── Subtitle ──────────────────────────────────────────────────────────
+        string sub = _isMono ? Strings.StatusMono : Strings.StatusStereo;
+        using var sf = new Font("Segoe UI", 10f, GraphicsUnit.Pixel);
+        using var sb = new SolidBrush(CMuted);
+        g.DrawString(sub, sf, sb, new PointF(tx + 1, mid + 8));
+
+        // ── Arrow hint (right edge) ────────────────────────────────────────────
+        string arrow = "›";
+        using var af  = new Font("Segoe UI", 18f, FontStyle.Regular, GraphicsUnit.Pixel);
+        using var asf = new StringFormat { Alignment = StringAlignment.Far, LineAlignment = StringAlignment.Center };
+        using var arb = new SolidBrush(Color.FromArgb(hover ? 80 : 40, accent.R, accent.G, accent.B));
+        g.DrawString(arrow, af, arb, new RectangleF(0, 0, btn.Width - 14, btn.Height), asf);
     }
 
-    // ─── Helpers ──────────────────────────────────────────────────────────────
+    // ─── Shared helpers ───────────────────────────────────────────────────────
 
-    private static void RoundRegion(Control c, int r)
+    internal static GraphicsPath RoundedPath(int x, int y, int w, int h, int r)
     {
-        var path = new GraphicsPath();
         int d = r * 2;
-        var rect = new Rectangle(0, 0, c.Width, c.Height);
-        path.AddArc(rect.X,         rect.Y,          d, d, 180, 90);
-        path.AddArc(rect.Right - d, rect.Y,          d, d, 270, 90);
-        path.AddArc(rect.Right - d, rect.Bottom - d, d, d,   0, 90);
-        path.AddArc(rect.X,         rect.Bottom - d, d, d,  90, 90);
-        path.CloseFigure();
-        c.Region = new Region(path);
+        var p = new GraphicsPath();
+        p.AddArc(x,         y,         d, d, 180, 90);
+        p.AddArc(x + w - d, y,         d, d, 270, 90);
+        p.AddArc(x + w - d, y + h - d, d, d,   0, 90);
+        p.AddArc(x,         y + h - d, d, d,  90, 90);
+        p.CloseFigure();
+        return p;
     }
 
-    private static Color Adj(Color c, int d) =>
-        Color.FromArgb(c.A, Math.Clamp(c.R + d, 0, 255),
-            Math.Clamp(c.G + d, 0, 255), Math.Clamp(c.B + d, 0, 255));
+    internal static Region RoundedRegion(int w, int h, int r)
+    {
+        using var p = RoundedPath(0, 0, w - 1, h - 1, r);
+        return new Region(p);
+    }
 
-    private static Icon MakeIcon(Color bg, string letter)
+    private static Icon MakeIcon(Color accent, string letter)
     {
         using var bmp = new Bitmap(32, 32);
         using var g   = Graphics.FromImage(bmp);
         g.SmoothingMode = SmoothingMode.AntiAlias;
         g.Clear(Color.Transparent);
-        g.FillEllipse(new SolidBrush(bg), 1, 1, 30, 30);
-        using var font = new Font("Segoe UI", 15f, FontStyle.Bold, GraphicsUnit.Pixel);
-        using var sf   = new StringFormat
-            { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-        g.DrawString(letter, font, Brushes.White, new RectangleF(0, 0, 32, 32), sf);
+        using var pen  = new Pen(accent, 2f);
+        g.DrawEllipse(pen, 2, 2, 27, 27);
+        using var font  = new Font("Segoe UI", 15f, FontStyle.Bold, GraphicsUnit.Pixel);
+        using var sf    = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+        using var brush = new SolidBrush(accent);
+        g.DrawString(letter, font, brush, new RectangleF(0, 0, 32, 32), sf);
         var h = bmp.GetHicon();
         var i = (Icon)Icon.FromHandle(h).Clone();
         DestroyIcon(h);
         return i;
     }
 
-    private static Label MkLabel(string text, Font font, Color color, Point loc) => new()
+    /// <summary>
+    /// Generates the main application icon: golden speaker on dark navy circle.
+    /// </summary>
+    private static Icon MakeAppIcon()
     {
-        Text = text, Font = font, ForeColor = color,
-        AutoSize = true, Location = loc, BackColor = Color.Transparent
-    };
+        using var bmp = new Bitmap(64, 64);
+        using var g   = Graphics.FromImage(bmp);
+        g.SmoothingMode     = SmoothingMode.AntiAlias;
+        g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
+        g.Clear(Color.Transparent);
 
-    private static CheckBox MkCheckBox(string text, Point loc, bool chk) => new()
-    {
-        Text = text, AutoSize = true, Location = loc, Checked = chk,
-        ForeColor = Color.FromArgb(185, 185, 185), FlatStyle = FlatStyle.Flat,
-        BackColor = Color.Transparent
-    };
+        // ── Background circle ─────────────────────────────────────────────────
+        using var bgBrush = new SolidBrush(Color.FromArgb(18, 24, 52));
+        g.FillEllipse(bgBrush, 0, 0, 63, 63);
+        using var bgPen = new Pen(Color.FromArgb(50, 60, 100), 1.5f);
+        g.DrawEllipse(bgPen, 1, 1, 61, 61);
+
+        // Gold colour
+        var gold      = Color.FromArgb(220, 168, 36);
+        var goldLight = Color.FromArgb(255, 210, 80);
+        var goldDim   = Color.FromArgb(160, 120, 20);
+
+        // ── Speaker body (rectangle, left-center) ─────────────────────────────
+        float bx = 12f, by = 23f, bw = 10f, bh = 18f;
+        using var bodyBrush = new LinearGradientBrush(
+            new PointF(bx, 0), new PointF(bx + bw, 0), goldDim, goldLight);
+        g.FillRectangle(bodyBrush, bx, by, bw, bh);
+
+        // ── Speaker cone (trapezoid expanding right) ──────────────────────────
+        var cone = new PointF[]
+        {
+            new(bx + bw, by),
+            new(bx + bw, by + bh),
+            new(bx + bw + 16f, by + bh + 8f),
+            new(bx + bw + 16f, by - 8f),
+        };
+        using var coneBrush = new LinearGradientBrush(
+            new PointF(bx + bw, 0), new PointF(bx + bw + 16f, 0), goldLight, gold);
+        g.FillPolygon(coneBrush, cone);
+
+        // Cone outline
+        using var outlinePen = new Pen(goldDim, 0.8f);
+        g.DrawPolygon(outlinePen, cone);
+        g.DrawRectangle(outlinePen, bx, by, bw, bh);
+
+        // ── Sound waves (arcs, right of cone) ─────────────────────────────────
+        float wx = bx + bw + 18f;
+        float cy = 32f;
+
+        using var wave1 = new Pen(gold, 2f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+        using var wave2 = new Pen(Color.FromArgb(180, gold.R, gold.G, gold.B), 1.8f)
+            { StartCap = LineCap.Round, EndCap = LineCap.Round };
+        using var wave3 = new Pen(Color.FromArgb(110, gold.R, gold.G, gold.B), 1.5f)
+            { StartCap = LineCap.Round, EndCap = LineCap.Round };
+
+        g.DrawArc(wave1, wx,       cy - 7f,  6f,  14f, -55, 110);
+        g.DrawArc(wave2, wx + 5f,  cy - 11f, 8f,  22f, -55, 110);
+        g.DrawArc(wave3, wx + 11f, cy - 15f, 9f,  30f, -55, 110);
+
+        // Convert to icon
+        var hicon = bmp.GetHicon();
+        var icon  = (Icon)Icon.FromHandle(hicon).Clone();
+        DestroyIcon(hicon);
+        return icon;
+    }
 
     private void ShowOverlay(bool isMono)
     {
@@ -985,65 +996,387 @@ public sealed class MainForm : Form
     }
 }
 
+// ─── HeaderBar ────────────────────────────────────────────────────────────────
+
+internal sealed class HeaderBar : Control
+{
+    public HeaderBar()
+    {
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                 ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw |
+                 ControlStyles.SupportsTransparentBackColor, true);
+        BackColor = Color.Transparent;
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        g.SmoothingMode     = SmoothingMode.AntiAlias;
+        g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
+
+        // Bottom border line
+        using var pen = new Pen(MainForm.CBorder, 1f);
+        g.DrawLine(pen, 0, Height - 1, Width, Height - 1);
+
+        // App title
+        using var tf = new Font("Segoe UI", 11f, FontStyle.Bold);
+        using var tb = new SolidBrush(MainForm.CAccentB);
+        g.DrawString(Strings.AppTitle, tf, tb, new PointF(18, 16));
+
+        // Version tag pill
+        const string ver = "v1.0";
+        using var vf   = new Font("Segoe UI", 7.5f, FontStyle.Bold);
+        float vw = g.MeasureString(ver, vf).Width + 10;
+        float vx = 18 + g.MeasureString(Strings.AppTitle, tf).Width + 8;
+        float vy = 18;
+        using var pillPath = MainForm.RoundedPath((int)vx, (int)vy, (int)vw, 16, 4);
+        using (var pb = new SolidBrush(Color.FromArgb(40, MainForm.CAccentB.R, MainForm.CAccentB.G, MainForm.CAccentB.B)))
+            g.FillPath(pb, pillPath);
+        using (var pp = new Pen(Color.FromArgb(80, MainForm.CAccentB.R, MainForm.CAccentB.G, MainForm.CAccentB.B), 1f))
+            g.DrawPath(pp, pillPath);
+        using var vb = new SolidBrush(MainForm.CAccentB);
+        using var vsf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+        g.DrawString(ver, vf, vb, new RectangleF(vx, vy, vw, 16), vsf);
+    }
+}
+
+// ─── SectionLabel ─────────────────────────────────────────────────────────────
+
+internal sealed class SectionLabel : Control
+{
+    private readonly string _text;
+
+    public SectionLabel(string text)
+    {
+        _text = text.ToUpperInvariant();
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                 ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true);
+        BackColor = Color.Transparent;
+        Height    = 20;
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        g.SmoothingMode     = SmoothingMode.AntiAlias;
+        g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
+
+        using var f  = new Font("Segoe UI", 7.5f, FontStyle.Bold);
+        using var b  = new SolidBrush(Color.FromArgb(110, MainForm.CAccentB.R, MainForm.CAccentB.G, MainForm.CAccentB.B));
+        using var lb = new SolidBrush(MainForm.CDim);
+
+        float tw = g.MeasureString(_text, f).Width;
+        g.DrawString(_text, f, b, new PointF(0, 2));
+
+        // Trailing line
+        int lx = (int)tw + 8;
+        int ly = Height / 2;
+        using var lp = new Pen(MainForm.CDim, 1f);
+        g.DrawLine(lp, lx, ly, Width, ly);
+    }
+}
+
+// ─── CardPanel ────────────────────────────────────────────────────────────────
+
+internal sealed class CardPanel : Panel
+{
+    public CardPanel()
+    {
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                 ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        using var path = MainForm.RoundedPath(0, 0, Width - 1, Height - 1, 10);
+        using (var fb = new SolidBrush(MainForm.CCard)) g.FillPath(fb, path);
+        using (var bp = new Pen(MainForm.CBorder, 1f))  g.DrawPath(bp, path);
+    }
+
+    protected override void OnPaintBackground(PaintEventArgs e) { }
+}
+
+// ─── DividerLine ──────────────────────────────────────────────────────────────
+
+internal sealed class DividerLine : Control
+{
+    public DividerLine()
+    {
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                 ControlStyles.SupportsTransparentBackColor, true);
+        BackColor = Color.Transparent;
+        Height = 1;
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        using var p = new Pen(Color.FromArgb(38, 38, 55), 1f);
+        e.Graphics.DrawLine(p, 0, 0, Width, 0);
+    }
+}
+
+// ─── ToggleSwitch ─────────────────────────────────────────────────────────────
+
+internal sealed class ToggleSwitch : Control
+{
+    private bool _checked;
+    private bool _hover;
+    private const int TW = 36, TH = 20;
+
+    public bool Checked
+    {
+        get => _checked;
+        set { _checked = value; Invalidate(); }
+    }
+
+    public event EventHandler? CheckedChanged;
+
+    public ToggleSwitch()
+    {
+        Size = new Size(TW, TH);
+        Cursor = Cursors.Hand;
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                 ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true);
+        BackColor = Color.Transparent;
+    }
+
+    protected override void OnMouseEnter(EventArgs e) { _hover = true;  Invalidate(); }
+    protected override void OnMouseLeave(EventArgs e) { _hover = false; Invalidate(); }
+
+    protected override void OnClick(EventArgs e)
+    {
+        _checked = !_checked;
+        CheckedChanged?.Invoke(this, EventArgs.Empty);
+        Invalidate();
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+
+        Color trackOn  = MainForm.CAccentB;
+        Color trackOff = Color.FromArgb(_hover ? 55 : 40, 55, 70);
+
+        // Track
+        using var trackPath = MainForm.RoundedPath(0, 0, TW - 1, TH - 1, TH / 2);
+        using (var tb = new SolidBrush(_checked ? trackOn : trackOff))
+            g.FillPath(tb, trackPath);
+
+        // Thumb
+        int thumbX = _checked ? TW - TH + 2 : 2;
+        int thumbY = 2;
+        int thumbD = TH - 4;
+        using var thumbBrush = new SolidBrush(Color.White);
+        g.FillEllipse(thumbBrush, thumbX, thumbY, thumbD, thumbD);
+    }
+}
+
+// ─── ToggleRow (label + ToggleSwitch) ────────────────────────────────────────
+
+internal sealed class ToggleRow : Control
+{
+    public ToggleSwitch Toggle { get; }
+    private readonly string _label;
+
+    public ToggleRow(string label, bool initialValue)
+    {
+        _label  = label;
+        Toggle  = new ToggleSwitch { Checked = initialValue };
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                 ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw |
+                 ControlStyles.SupportsTransparentBackColor, true);
+        BackColor = Color.Transparent;
+        Controls.Add(Toggle);
+        Toggle.CheckedChanged += (s, e) => Toggle.Checked = Toggle.Checked; // relay
+    }
+
+    protected override void OnResize(EventArgs e)
+    {
+        base.OnResize(e);
+        Toggle.Location = new Point(Width - Toggle.Width - 16, (Height - Toggle.Height) / 2);
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        g.SmoothingMode     = SmoothingMode.AntiAlias;
+        g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
+        using var f = new Font("Segoe UI", 9f);
+        using var b = new SolidBrush(MainForm.CText);
+        g.DrawString(_label, f, b, new PointF(16, (Height - g.MeasureString(_label, f).Height) / 2));
+    }
+}
+
+// ─── HotkeyBox ────────────────────────────────────────────────────────────────
+
+internal sealed class HotkeyBox : Control
+{
+    private string  _displayText = Strings.HotkeyNone;
+    private bool    _recording;
+    private bool    _error;
+    private bool    _hoverSet;
+    private bool    _hoverClear;
+
+    public event EventHandler? SetClicked;
+    public event EventHandler? ClearClicked;
+
+    private const int BtnW  = 58;
+    private const int BtnH  = 24;
+    private const int BtnGap = 6;
+
+    public HotkeyBox()
+    {
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                 ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw |
+                 ControlStyles.SupportsTransparentBackColor, true);
+        BackColor = Color.Transparent;
+        Cursor    = Cursors.Default;
+    }
+
+    public void StartRecording()
+    {
+        _recording    = true;
+        _error        = false;
+        _displayText  = Strings.HotkeyPrompt;
+        Invalidate();
+    }
+
+    public void SetValue(string text, bool success)
+    {
+        _recording   = false;
+        _error       = !success;
+        _displayText = text;
+        Invalidate();
+    }
+
+    public void CancelRecording(string fallback)
+    {
+        _recording   = false;
+        _error       = false;
+        _displayText = fallback;
+        Invalidate();
+    }
+
+    // ── Hit testing ──────────────────────────────────────────────────────────
+
+    private Rectangle SetRect   => new(Width - (BtnW + BtnGap + BtnW) - 14, (Height - BtnH) / 2, BtnW, BtnH);
+    private Rectangle ClearRect => new(Width - BtnW - 14,                   (Height - BtnH) / 2, BtnW, BtnH);
+
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        bool hs = SetRect.Contains(e.Location);
+        bool hc = ClearRect.Contains(e.Location);
+        if (hs != _hoverSet || hc != _hoverClear) { _hoverSet = hs; _hoverClear = hc; Invalidate(); }
+        Cursor = (hs || hc) ? Cursors.Hand : Cursors.Default;
+    }
+
+    protected override void OnMouseLeave(EventArgs e)
+    { _hoverSet = _hoverClear = false; Invalidate(); }
+
+    protected override void OnMouseUp(MouseEventArgs e)
+    {
+        if (e.Button != MouseButtons.Left) return;
+        if (SetRect.Contains(e.Location))   SetClicked?.Invoke(this, EventArgs.Empty);
+        if (ClearRect.Contains(e.Location)) ClearClicked?.Invoke(this, EventArgs.Empty);
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        g.SmoothingMode     = SmoothingMode.AntiAlias;
+        g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
+
+        // ── Label ─────────────────────────────────────────────────────────────
+        using var lf = new Font("Segoe UI", 9f);
+        using var lb = new SolidBrush(MainForm.CMuted);
+        g.DrawString(Strings.HotkeyLabel, lf, lb, new PointF(16, (Height - g.MeasureString("A", lf).Height) / 2));
+
+        // ── Value display ─────────────────────────────────────────────────────
+        int valX = 16 + (int)g.MeasureString(Strings.HotkeyLabel, lf).Width + 8;
+        int valW = SetRect.Left - valX - 10;
+        var dispColor = _recording ? Color.FromArgb(255, 190, 50)
+                      : _error     ? Color.FromArgb(220, 80,  80)
+                      : MainForm.CText;
+        using var df = new Font("Segoe UI", 9f, _recording ? FontStyle.Italic : FontStyle.Regular);
+        using var db = new SolidBrush(dispColor);
+        using var dsf = new StringFormat { LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisCharacter };
+        g.DrawString(_displayText, df, db, new RectangleF(valX, 0, valW, Height), dsf);
+
+        // ── Set button ────────────────────────────────────────────────────────
+        PaintPillButton(g, SetRect, _recording ? Strings.HotkeyRecording : Strings.HotkeySet,
+            _recording ? Color.FromArgb(255, 190, 50) : MainForm.CAccentB, _hoverSet);
+
+        // ── Clear button ──────────────────────────────────────────────────────
+        PaintPillButton(g, ClearRect, Strings.HotkeyClear,
+            Color.FromArgb(210, 80, 80), _hoverClear);
+    }
+
+    private static void PaintPillButton(Graphics g, Rectangle r, string text, Color accent, bool hover)
+    {
+        var bg = Color.FromArgb(hover ? 35 : 20, accent.R, accent.G, accent.B);
+        using var path = MainForm.RoundedPath(r.X, r.Y, r.Width, r.Height, r.Height / 2);
+        using (var fb = new SolidBrush(bg)) g.FillPath(fb, path);
+        using (var pp = new Pen(Color.FromArgb(hover ? 160 : 100, accent.R, accent.G, accent.B), 1f))
+            g.DrawPath(pp, path);
+        using var tf  = new Font("Segoe UI", 8f, FontStyle.Bold);
+        using var tb  = new SolidBrush(hover ? accent : Color.FromArgb(180, accent.R, accent.G, accent.B));
+        using var tsf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+        g.DrawString(text, tf, tb, r, tsf);
+    }
+}
+
 // ─── Dark menu renderer ───────────────────────────────────────────────────────
 
 internal sealed class DarkMenuRenderer : ToolStripProfessionalRenderer
 {
-    private static readonly Color Bg    = Color.FromArgb(38, 38, 38);
-    private static readonly Color Hover = Color.FromArgb(60, 60, 60);
-    private static readonly Color Line  = Color.FromArgb(62, 62, 62);
-
     public DarkMenuRenderer() : base(new DarkColorTable()) { }
 
     protected override void OnRenderToolStripBackground(ToolStripRenderEventArgs e)
-    { using var b = new SolidBrush(Bg); e.Graphics.FillRectangle(b, e.AffectedBounds); }
+    { using var b = new SolidBrush(MainForm.CCard); e.Graphics.FillRectangle(b, e.AffectedBounds); }
 
     protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e)
-    { using var b = new SolidBrush(e.Item.Selected ? Hover : Bg);
+    { using var b = new SolidBrush(e.Item.Selected ? MainForm.CDim : MainForm.CCard);
       e.Graphics.FillRectangle(b, e.Item.ContentRectangle); }
 
     protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
-    { e.TextColor = e.Item.Enabled ? Color.FromArgb(218, 218, 218) : Color.FromArgb(90, 90, 90);
+    { e.TextColor = e.Item.Enabled ? MainForm.CText : MainForm.CMuted;
       base.OnRenderItemText(e); }
 
     protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e)
     { int y = e.Item.ContentRectangle.Height / 2;
-      using var p = new Pen(Line);
+      using var p = new Pen(MainForm.CBorder);
       e.Graphics.DrawLine(p, e.Item.ContentRectangle.Left, y, e.Item.ContentRectangle.Right, y); }
 }
 
 internal sealed class DarkColorTable : ProfessionalColorTable
 {
-    private static readonly Color C = Color.FromArgb(38, 38, 38);
-    private static readonly Color B = Color.FromArgb(62, 62, 62);
-    public override Color MenuBorder                  => B;
-    public override Color ToolStripDropDownBackground => C;
-    public override Color ImageMarginGradientBegin    => C;
-    public override Color ImageMarginGradientMiddle   => C;
-    public override Color ImageMarginGradientEnd      => C;
+    public override Color MenuBorder                  => MainForm.CBorder;
+    public override Color ToolStripDropDownBackground => MainForm.CCard;
+    public override Color ImageMarginGradientBegin    => MainForm.CCard;
+    public override Color ImageMarginGradientMiddle   => MainForm.CCard;
+    public override Color ImageMarginGradientEnd      => MainForm.CCard;
 }
 
 // ─── Audio state overlay ──────────────────────────────────────────────────────
 
 internal sealed class OverlayForm : Form
 {
-    private readonly bool   _isMono;
+    private readonly bool _isMono;
     private readonly System.Windows.Forms.Timer _timer;
     private int _tick;
 
-    // Timing (each tick = 20 ms)
-    private const int FadeInTicks  =  8;   //  160 ms fade-in
-    private const int HoldTicks    = 135;  // 2700 ms hold
-    private const int FadeOutTicks = 12;   //  240 ms fade-out
+    private const int FadeInTicks  =  8;
+    private const int HoldTicks    = 135;
+    private const int FadeOutTicks = 12;
     private const int TotalTicks   = FadeInTicks + HoldTicks + FadeOutTicks;
-
-    private const int W = 230;
-    private const int H = 76;
+    private const int W = 240, H = 78;
 
     public OverlayForm(bool isMono)
     {
-        _isMono = isMono;
-
+        _isMono         = isMono;
         FormBorderStyle = FormBorderStyle.None;
         ShowInTaskbar   = false;
         TopMost         = true;
@@ -1053,7 +1386,6 @@ internal sealed class OverlayForm : Form
         Size            = new Size(W, H);
         Opacity         = 0;
 
-        // Bottom-right of the screen where the mouse cursor currently is
         var wa = Screen.FromPoint(Cursor.Position).WorkingArea;
         Location = new Point(wa.Right - W - 24, wa.Bottom - H - 24);
 
@@ -1062,86 +1394,56 @@ internal sealed class OverlayForm : Form
                  ControlStyles.UserPaint, true);
 
         _timer = new System.Windows.Forms.Timer { Interval = 20 };
-        _timer.Tick += OnTick;
+        _timer.Tick += (_, _) =>
+        {
+            _tick++;
+            Opacity = _tick <= FadeInTicks                 ? (double)_tick / FadeInTicks
+                    : _tick <= FadeInTicks + HoldTicks     ? 1.0
+                    : _tick <= TotalTicks                  ? 1.0 - (double)(_tick - FadeInTicks - HoldTicks) / FadeOutTicks
+                    : 0;
+            if (_tick > TotalTicks) { _timer.Stop(); Close(); }
+        };
         _timer.Start();
     }
 
-    // Prevent stealing focus
     protected override bool ShowWithoutActivation => true;
     protected override CreateParams CreateParams
     {
-        get
-        {
-            var cp   = base.CreateParams;
-            cp.ExStyle |= 0x08000000; // WS_EX_NOACTIVATE
-            cp.ExStyle |= 0x00000080; // WS_EX_TOOLWINDOW
-            return cp;
-        }
-    }
-
-    private void OnTick(object? sender, EventArgs e)
-    {
-        _tick++;
-        Opacity = _tick switch
-        {
-            <= FadeInTicks                          => (double)_tick / FadeInTicks,
-            <= FadeInTicks + HoldTicks              => 1.0,
-            <= TotalTicks                           => 1.0 - (double)(_tick - FadeInTicks - HoldTicks) / FadeOutTicks,
-            _                                       => 0
-        };
-        if (_tick > TotalTicks) { _timer.Stop(); Close(); }
+        get { var cp = base.CreateParams; cp.ExStyle |= 0x08000000 | 0x00000080; return cp; }
     }
 
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics;
         g.SmoothingMode     = SmoothingMode.AntiAlias;
-        g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+        g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
 
-        // ── Background rounded rect ───────────────────────────────────────────
-        const int r = 12;
-        using var path = BuildRoundedPath(0, 0, W, H, r);
-        using (var bg = new SolidBrush(Color.FromArgb(30, 30, 30)))
-            g.FillPath(bg, path);
-        using (var border = new Pen(Color.FromArgb(65, 65, 65), 1f))
-            g.DrawPath(border, path);
+        Color accent = _isMono ? MainForm.CAccentB : MainForm.CAccentG;
 
-        // ── Circle icon ───────────────────────────────────────────────────────
-        var circleColor = _isMono ? Color.FromArgb(0, 103, 192) : Color.FromArgb(72, 72, 72);
-        const int cx = 14, cy = 14, cs = 48;
-        using (var circleBrush = new SolidBrush(circleColor))
-            g.FillEllipse(circleBrush, cx, cy, cs, cs);
+        using var path = MainForm.RoundedPath(0, 0, W - 1, H - 1, 12);
+        using (var bg = new SolidBrush(Color.FromArgb(20, 20, 28))) g.FillPath(bg, path);
+        using (var bp = new Pen(accent, 1.2f)) g.DrawPath(bp, path);
 
-        string letter = _isMono ? "M" : "S";
-        using var lf = new Font("Segoe UI", 22f, FontStyle.Bold, GraphicsUnit.Pixel);
-        using var sf = new StringFormat
-            { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-        g.DrawString(letter, lf, Brushes.White, new RectangleF(cx, cy, cs, cs), sf);
+        // Circle badge
+        const int cx = 16, cs = 46;
+        int cty = (H - cs) / 2;
+        var badgeBg = Color.FromArgb(30, accent.R, accent.G, accent.B);
+        using (var bb = new SolidBrush(badgeBg)) g.FillEllipse(bb, cx, cty, cs, cs);
+        using (var bp2 = new Pen(accent, 1.5f)) g.DrawEllipse(bp2, cx, cty, cs, cs);
 
-        // ── State text ────────────────────────────────────────────────────────
-        const int tx = 74;
-        string mainText = _isMono ? Strings.BtnMono : Strings.BtnStereo;
-        var mainColor = _isMono ? Color.FromArgb(100, 180, 255) : Color.FromArgb(230, 230, 230);
-        using var mf        = new Font("Segoe UI", 20f, FontStyle.Bold, GraphicsUnit.Pixel);
-        using var mainBrush = new SolidBrush(mainColor);
-        g.DrawString(mainText, mf, mainBrush, new PointF(tx, 10));
+        using var lf  = new Font("Segoe UI", 22f, FontStyle.Bold, GraphicsUnit.Pixel);
+        using var lb  = new SolidBrush(accent);
+        using var lsf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+        g.DrawString(_isMono ? "M" : "S", lf, lb, new RectangleF(cx, cty, cs, cs), lsf);
 
-        string subText = _isMono ? Strings.OverlayMonoSub : Strings.OverlayStereoSub;
-        using var sf2     = new Font("Segoe UI", 11f, GraphicsUnit.Pixel);
-        using var subBrush = new SolidBrush(Color.FromArgb(120, 120, 120));
-        g.DrawString(subText, sf2, subBrush, new PointF(tx + 1, 38));
-    }
+        int tx = cx + cs + 14, mid = H / 2;
+        using var mf = new Font("Segoe UI", 20f, FontStyle.Bold, GraphicsUnit.Pixel);
+        using var mb = new SolidBrush(accent);
+        g.DrawString(_isMono ? Strings.BtnMono : Strings.BtnStereo, mf, mb, new PointF(tx, mid - 16));
 
-    private static GraphicsPath BuildRoundedPath(int x, int y, int w, int h, int r)
-    {
-        int d = r * 2;
-        var p = new GraphicsPath();
-        p.AddArc(x,         y,         d, d, 180, 90);
-        p.AddArc(x + w - d, y,         d, d, 270, 90);
-        p.AddArc(x + w - d, y + h - d, d, d,   0, 90);
-        p.AddArc(x,         y + h - d, d, d,  90, 90);
-        p.CloseFigure();
-        return p;
+        using var sf = new Font("Segoe UI", 10f, GraphicsUnit.Pixel);
+        using var sb = new SolidBrush(MainForm.CMuted);
+        g.DrawString(_isMono ? Strings.OverlayMonoSub : Strings.OverlayStereoSub, sf, sb, new PointF(tx + 1, mid + 5));
     }
 
     protected override void Dispose(bool disposing)

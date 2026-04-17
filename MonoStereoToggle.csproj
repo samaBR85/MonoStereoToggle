@@ -10,10 +10,14 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon />
     <Optimize>true</Optimize>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
 
     <!-- Metadados do assembly — visíveis em Propriedades → Detalhes no Explorer -->
     <Product>MonoStereoToggle</Product>
     <Version>1.0.0</Version>
+    <FileVersion>1.0.0.0</FileVersion>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <Authors>samaBR</Authors>
     <Company>samaBR</Company>
     <Copyright>© 2026 | samaBR - https://github.com/samaBR85</Copyright>
