@@ -190,7 +190,7 @@ public sealed class MainForm : Form
         Font            = new Font("Segoe UI", 10f);
 
         // ── Title ─────────────────────────────────────────────────────────────
-        var lblTitle = MkLabel("Alternador de Áudio",
+        var lblTitle = MkLabel(Strings.AppTitle,
             new Font(new FontFamily("Segoe UI Light"), 16f), Color.White, new Point(20, 16));
         lblTitle.Anchor = AnchorStyles.Top | AnchorStyles.Left;
         Controls.Add(lblTitle);
@@ -233,7 +233,7 @@ public sealed class MainForm : Form
         Controls.Add(sep1);
 
         // ── Devices label ─────────────────────────────────────────────────────
-        var lblDev = MkLabel("Dispositivos de saída disponíveis:",
+        var lblDev = MkLabel(Strings.DevicesLabel,
             new Font("Segoe UI", 8.5f), Color.FromArgb(160, 160, 160), new Point(20, 188));
         lblDev.Anchor = AnchorStyles.Top | AnchorStyles.Left;
         Controls.Add(lblDev);
@@ -256,7 +256,7 @@ public sealed class MainForm : Form
         Controls.Add(_listDevices);
 
         // ── Device hint ───────────────────────────────────────────────────────
-        var lblDeviceHint = MkLabel("Áudio mono é uma configuração global do Windows",
+        var lblDeviceHint = MkLabel(Strings.DeviceHint,
             new Font("Segoe UI", 7.5f), Color.FromArgb(80, 80, 80),
             new Point(20, ClientSize.Height - 218));
         lblDeviceHint.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
@@ -273,7 +273,7 @@ public sealed class MainForm : Form
         Controls.Add(sep2);
 
         // ── Startup checkbox ──────────────────────────────────────────────────
-        _chkStartup = MkCheckBox("  Iniciar com o Windows",
+        _chkStartup = MkCheckBox(Strings.ChkStartup,
             new Point(20, ClientSize.Height - 186),
             IsStartupTaskRegistered());
         _chkStartup.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
@@ -281,7 +281,7 @@ public sealed class MainForm : Form
         Controls.Add(_chkStartup);
 
         // ── Tray checkbox ─────────────────────────────────────────────────────
-        _chkTray = MkCheckBox("  Iniciar na bandeja do sistema",
+        _chkTray = MkCheckBox(Strings.ChkTray,
             new Point(20, ClientSize.Height - 154),
             RegGet<int>(APP_KEY, "StartInTray") == 1);
         _chkTray.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
@@ -300,7 +300,7 @@ public sealed class MainForm : Form
         Controls.Add(sep3);
 
         // ── Hotkey row ────────────────────────────────────────────────────────
-        var lblHk = MkLabel("Atalho:", new Font("Segoe UI", 9f),
+        var lblHk = MkLabel(Strings.HotkeyLabel, new Font("Segoe UI", 9f),
             Color.FromArgb(160, 160, 160), new Point(20, ClientSize.Height - 103));
         lblHk.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
         Controls.Add(lblHk);
@@ -315,7 +315,7 @@ public sealed class MainForm : Form
             ForeColor = Color.FromArgb(200, 200, 200),
             Font      = new Font("Segoe UI", 9f),
             BorderStyle = BorderStyle.FixedSingle,
-            Text      = "Nenhum",
+            Text      = Strings.HotkeyNone,
             Cursor    = Cursors.Default,
             TabStop   = false
         };
@@ -326,7 +326,7 @@ public sealed class MainForm : Form
             Location  = new Point(ClientSize.Width - 156, ClientSize.Height - 108),
             Size      = new Size(68, 26),
             Anchor    = AnchorStyles.Bottom | AnchorStyles.Right,
-            Text      = "Definir",
+            Text      = Strings.HotkeySet,
             FlatStyle = FlatStyle.Flat,
             Font      = new Font("Segoe UI", 8.5f),
             ForeColor = Color.FromArgb(200, 200, 200),
@@ -342,7 +342,7 @@ public sealed class MainForm : Form
             Location  = new Point(ClientSize.Width - 84, ClientSize.Height - 108),
             Size      = new Size(64, 26),
             Anchor    = AnchorStyles.Bottom | AnchorStyles.Right,
-            Text      = "Limpar",
+            Text      = Strings.HotkeyClear,
             FlatStyle = FlatStyle.Flat,
             Font      = new Font("Segoe UI", 8.5f),
             ForeColor = Color.FromArgb(160, 80, 80),
@@ -354,7 +354,7 @@ public sealed class MainForm : Form
         Controls.Add(_btnClearHotkey);
 
         // ── Footer ────────────────────────────────────────────────────────────
-        var footer = MkLabel("Clique duplo no ícone da bandeja para abrir  |  Atalho funciona globalmente",
+        var footer = MkLabel(Strings.Footer,
             new Font("Segoe UI", 7.5f), Color.FromArgb(70, 70, 70),
             new Point(20, ClientSize.Height - 52));
         footer.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
@@ -372,8 +372,8 @@ public sealed class MainForm : Form
         _trayMenu = new ContextMenuStrip { Renderer = new DarkMenuRenderer() };
         _trayMenu.Items.Add(_trayToggleItem);
         _trayMenu.Items.Add(new ToolStripSeparator());
-        _trayMenu.Items.Add("Abrir",  null, (_, _) => RestoreWindow());
-        _trayMenu.Items.Add("Fechar", null, (_, _) => ExitApp());
+        _trayMenu.Items.Add(Strings.TrayOpen,  null, (_, _) => RestoreWindow());
+        _trayMenu.Items.Add(Strings.TrayClose, null, (_, _) => ExitApp());
 
         _tray = new NotifyIcon { ContextMenuStrip = _trayMenu, Visible = true };
         _tray.DoubleClick += (_, _) => RestoreWindow();
@@ -520,7 +520,7 @@ public sealed class MainForm : Form
             var tw = g.MeasureString(dev.Name, nameFont).Width;
             using var tagFont  = new Font("Segoe UI", 7.5f);
             using var tagBrush = new SolidBrush(Color.FromArgb(0, 150, 80));
-            g.DrawString("(padrão)", tagFont, tagBrush,
+            g.DrawString(Strings.DeviceDefault, tagFont, tagBrush,
                 new PointF(rect.X + 24 + tw + 4, rect.Y + 6));
         }
 
@@ -542,7 +542,7 @@ public sealed class MainForm : Form
 
         bool newState = !_isMono;
 
-        _lblStatus.Text      = "Aguarde…";
+        _lblStatus.Text      = Strings.StatusWait;
         _lblStatus.ForeColor = Color.FromArgb(255, 190, 50);
         _btnToggle.Text      = "…";
         _btnToggle.Invalidate();
@@ -577,7 +577,7 @@ public sealed class MainForm : Form
                 WriteRegistryState(!newState); // revert
                 Invoke(() =>
                 {
-                    MessageBox.Show($"Erro:\n{ex.Message}", APP_NAME);
+                    MessageBox.Show($"{Strings.ErrorPrefix}\n{ex.Message}", APP_NAME);
                     ApplyState();
                     _btnToggle.Enabled = true;
                     _busy = false;
@@ -649,9 +649,9 @@ public sealed class MainForm : Form
     {
         if (_recordingHotkey) { CancelHotkeyRecording(); return; }
         _recordingHotkey = true;
-        _btnSetHotkey.Text     = "Pressione…";
+        _btnSetHotkey.Text      = Strings.HotkeyRecording;
         _btnSetHotkey.ForeColor = Color.FromArgb(255, 190, 50);
-        _txtHotkey.Text        = "Pressione a combinação de teclas…";
+        _txtHotkey.Text         = Strings.HotkeyPrompt;
         _txtHotkey.BackColor   = Color.FromArgb(45, 42, 28);
     }
 
@@ -690,16 +690,17 @@ public sealed class MainForm : Form
             _hotkeyRegistered = true;
             _txtHotkey.Text      = HotkeyToString(modifiers, vk);
             _txtHotkey.BackColor = Color.FromArgb(38, 38, 38);
+
             RegSet(APP_KEY, "HotkeyMods", (int)modifiers);
             RegSet(APP_KEY, "HotkeyVk",   (int)vk);
         }
         else
         {
-            _txtHotkey.Text      = "Combinação já em uso";
+            _txtHotkey.Text      = Strings.HotkeyInUse;
             _txtHotkey.BackColor = Color.FromArgb(60, 28, 28);
         }
         _recordingHotkey        = false;
-        _btnSetHotkey.Text      = "Definir";
+        _btnSetHotkey.Text      = Strings.HotkeySet;
         _btnSetHotkey.ForeColor = Color.FromArgb(200, 200, 200);
     }
 
@@ -707,7 +708,7 @@ public sealed class MainForm : Form
     {
         if (_hotkeyRegistered) { UnregisterHotKey(Handle, HOTKEY_ID); _hotkeyRegistered = false; }
         _hotkeyModifiers = 0; _hotkeyVk = 0;
-        _txtHotkey.Text      = "Nenhum";
+        _txtHotkey.Text      = Strings.HotkeyNone;
         _txtHotkey.BackColor = Color.FromArgb(38, 38, 38);
         RegSet(APP_KEY, "HotkeyMods", 0);
         RegSet(APP_KEY, "HotkeyVk",   0);
@@ -716,11 +717,11 @@ public sealed class MainForm : Form
     private void CancelHotkeyRecording()
     {
         _recordingHotkey        = false;
-        _btnSetHotkey.Text      = "Definir";
+        _btnSetHotkey.Text      = Strings.HotkeySet;
         _btnSetHotkey.ForeColor = Color.FromArgb(200, 200, 200);
         _txtHotkey.Text         = _hotkeyRegistered
             ? HotkeyToString(_hotkeyModifiers, _hotkeyVk)
-            : "Nenhum";
+            : Strings.HotkeyNone;
         _txtHotkey.BackColor    = Color.FromArgb(38, 38, 38);
     }
 
@@ -734,7 +735,7 @@ public sealed class MainForm : Form
             _hotkeyModifiers  = mods;
             _hotkeyVk         = vk;
             _hotkeyRegistered = true;
-            _txtHotkey.Text   = HotkeyToString(mods, vk);
+            _txtHotkey.Text = HotkeyToString(mods, vk);
         }
     }
 
@@ -752,7 +753,7 @@ public sealed class MainForm : Form
             >= Keys.D0 and <= Keys.D9 => ((char)('0' + (key - Keys.D0))).ToString(),
             >= Keys.F1 and <= Keys.F24 => $"F{key - Keys.F1 + 1}",
             >= Keys.NumPad0 and <= Keys.NumPad9 => $"Num{key - Keys.NumPad0}",
-            Keys.Space    => "Espaço",
+            Keys.Space    => Strings.KeySpace,
             Keys.Return   => "Enter",
             Keys.Tab      => "Tab",
             Keys.Back     => "Backspace",
@@ -778,20 +779,18 @@ public sealed class MainForm : Form
 
     private void ApplyState()
     {
-        _btnToggle.Text      = _isMono ? "MONO" : "ESTÉREO";
+        _btnToggle.Text      = _isMono ? Strings.BtnMono : Strings.BtnStereo;
         _btnToggle.BackColor = _isMono ? Color.FromArgb(0, 103, 192) : Color.FromArgb(58, 58, 58);
         _btnToggle.Invalidate();
 
-        _lblStatus.Text      = _isMono
-            ? "Mono ativo  —  canais L+R mixados em um"
-            : "Estéreo ativo  —  canais independentes";
+        _lblStatus.Text      = _isMono ? Strings.StatusMono : Strings.StatusStereo;
         _lblStatus.ForeColor = _isMono
             ? Color.FromArgb(90, 170, 255)
             : Color.FromArgb(140, 140, 140);
 
         _tray.Icon           = _isMono ? _iconMono : _iconStereo;
-        _tray.Text           = _isMono ? "Áudio MONO" : "Áudio ESTÉREO";
-        _trayToggleItem.Text = _isMono ? "Mudar para Estéreo" : "Mudar para Mono";
+        _tray.Text           = _isMono ? Strings.TrayMono : Strings.TrayStereo;
+        _trayToggleItem.Text = _isMono ? Strings.TrayToStereo : Strings.TrayToMono;
     }
 
     // ─── Registry ─────────────────────────────────────────────────────────────
@@ -856,7 +855,7 @@ public sealed class MainForm : Form
                 RunSchtasks($"/delete /tn \"{APP_NAME}\" /f", ignoreExitCode: true);
             }
         }
-        catch (Exception ex) { MessageBox.Show($"Erro ao configurar startup:\n{ex.Message}", APP_NAME); }
+        catch (Exception ex) { MessageBox.Show($"{Strings.StartupError}\n{ex.Message}", APP_NAME); }
     }
 
     private static bool IsStartupTaskRegistered()
@@ -1121,13 +1120,13 @@ internal sealed class OverlayForm : Form
 
         // ── State text ────────────────────────────────────────────────────────
         const int tx = 74;
-        string mainText = _isMono ? "MONO" : "ESTÉREO";
+        string mainText = _isMono ? Strings.BtnMono : Strings.BtnStereo;
         var mainColor = _isMono ? Color.FromArgb(100, 180, 255) : Color.FromArgb(230, 230, 230);
         using var mf        = new Font("Segoe UI", 20f, FontStyle.Bold, GraphicsUnit.Pixel);
         using var mainBrush = new SolidBrush(mainColor);
         g.DrawString(mainText, mf, mainBrush, new PointF(tx, 10));
 
-        string subText = _isMono ? "Áudio mono ativo" : "Áudio estéreo ativo";
+        string subText = _isMono ? Strings.OverlayMonoSub : Strings.OverlayStereoSub;
         using var sf2     = new Font("Segoe UI", 11f, GraphicsUnit.Pixel);
         using var subBrush = new SolidBrush(Color.FromArgb(120, 120, 120));
         g.DrawString(subText, sf2, subBrush, new PointF(tx + 1, 38));
