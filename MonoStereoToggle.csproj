@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>MonoStereoToggle</RootNamespace>
+    <AssemblyName>MonoStereoToggle</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon />
+    <Optimize>true</Optimize>
+
+    <!-- Metadados do assembly — visíveis em Propriedades → Detalhes no Explorer -->
+    <Product>MonoStereoToggle</Product>
+    <Version>1.0.0</Version>
+    <Authors>samaBR</Authors>
+    <Company>samaBR</Company>
+    <Copyright>© 2026 | samaBR - https://github.com/samaBR85</Copyright>
+    <Description>Alterna o áudio do Windows entre modo MONO e ESTÉREO</Description>
+    <PackageProjectUrl>https://github.com/samaBR85</PackageProjectUrl>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="8.0.0" />
+  </ItemGroup>
+</Project>
