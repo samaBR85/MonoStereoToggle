@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MonoStereoToggle</title>
+  <title>MonoStereoToggle — Switch Windows Audio Mono ↔ Stereo</title>
   <meta name="description" content="Instantly switch Windows audio between Mono and Stereo. Free, lightweight, no installation required." />
   <link rel="canonical" href="https://samabr85.github.io/MonoStereoToggle/" />
 
@@ -24,34 +24,27 @@
     "applicationCategory": "UtilitiesApplication",
     "operatingSystem": "Windows 11",
     "softwareVersion": "1.1",
-    "description": "A lightweight Windows 11 utility to instantly switch your audio output between Mono and Stereo modes — the same setting found in Windows Settings → Accessibility → Audio.",
-    "offers": {
-      "@type": "Offer",
-      "price": "0",
-      "priceCurrency": "USD"
-    },
-    "author": {
-      "@type": "Person",
-      "name": "samaBR",
-      "url": "https://github.com/samaBR85"
-    },
+    "description": "A lightweight Windows 11 utility to instantly switch your audio output between Mono and Stereo modes.",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "author": { "@type": "Person", "name": "samaBR", "url": "https://github.com/samaBR85" },
     "license": "https://github.com/samaBR85/MonoStereoToggle/blob/main/LICENSE",
     "codeRepository": "https://github.com/samaBR85/MonoStereoToggle",
     "keywords": "mono audio, stereo audio, windows accessibility, audio toggle, windows 11"
   }
   </script>
+
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg:       #0d0d10;
-      --card:     #16161e;
-      --border:   #303048;
-      --blue:     #4a9eff;
-      --green:    #2dd28c;
-      --text:     #d7d7e6;
-      --muted:    #5a5a6e;
-      --dim:      #303048;
+      --bg:     #0d0d10;
+      --card:   #16161e;
+      --border: #303048;
+      --blue:   #4a9eff;
+      --green:  #2dd28c;
+      --text:   #d7d7e6;
+      --muted:  #5a5a6e;
+      --dim:    #303048;
     }
 
     html { scroll-behavior: smooth; }
@@ -64,12 +57,11 @@
       line-height: 1.6;
     }
 
-    /* ── Nav ─────────────────────────────────────────────────────── */
+    /* ── Nav ─────────────────────────────────────────── */
     nav {
       position: sticky; top: 0; z-index: 100;
       display: flex; align-items: center; justify-content: space-between;
-      padding: 0 2rem;
-      height: 56px;
+      padding: 0 2rem; height: 56px;
       background: rgba(13,13,16,.88);
       backdrop-filter: blur(12px);
       border-bottom: 1px solid var(--border);
@@ -80,8 +72,9 @@
       font-weight: 700; font-size: 1rem; color: var(--blue);
       text-decoration: none;
     }
-
     .nav-logo svg { width: 26px; height: 26px; }
+
+    .nav-right { display: flex; align-items: center; gap: 1.2rem; }
 
     .nav-links { display: flex; gap: 1.5rem; }
     .nav-links a {
@@ -90,7 +83,29 @@
     }
     .nav-links a:hover { color: var(--text); }
 
-    /* ── Hero ────────────────────────────────────────────────────── */
+    /* Language switcher */
+    .lang-switcher {
+      display: flex;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .lang-btn {
+      padding: .25rem .6rem;
+      font-size: .78rem; font-weight: 700;
+      background: transparent;
+      color: var(--muted);
+      border: none; cursor: pointer;
+      transition: background .15s, color .15s;
+      letter-spacing: .04em;
+    }
+    .lang-btn.active {
+      background: var(--blue);
+      color: #000;
+    }
+    .lang-btn:not(.active):hover { background: var(--dim); color: var(--text); }
+
+    /* ── Hero ────────────────────────────────────────── */
     .hero {
       max-width: 860px; margin: 0 auto;
       padding: 5rem 2rem 3rem;
@@ -110,8 +125,7 @@
 
     h1 {
       font-size: clamp(2rem, 5vw, 3.2rem);
-      font-weight: 800;
-      line-height: 1.15;
+      font-weight: 800; line-height: 1.15;
       margin-bottom: 1rem;
       background: linear-gradient(135deg, #fff 30%, var(--blue));
       -webkit-background-clip: text;
@@ -128,8 +142,7 @@
 
     .btn {
       display: inline-flex; align-items: center; gap: .5rem;
-      padding: .7rem 1.6rem;
-      border-radius: 8px;
+      padding: .7rem 1.6rem; border-radius: 8px;
       font-size: .95rem; font-weight: 600;
       text-decoration: none;
       transition: transform .15s, box-shadow .15s;
@@ -138,22 +151,18 @@
     .btn:hover { transform: translateY(-2px); }
 
     .btn-primary {
-      background: var(--blue);
-      color: #000;
+      background: var(--blue); color: #000;
       box-shadow: 0 4px 24px color-mix(in srgb, var(--blue) 35%, transparent);
     }
     .btn-primary:hover {
       box-shadow: 0 6px 32px color-mix(in srgb, var(--blue) 50%, transparent);
     }
-
     .btn-outline {
-      border: 1px solid var(--border);
-      color: var(--text);
-      background: transparent;
+      border: 1px solid var(--border); color: var(--text); background: transparent;
     }
     .btn-outline:hover { border-color: var(--blue); color: var(--blue); }
 
-    /* ── App preview card ────────────────────────────────────────── */
+    /* ── App preview ─────────────────────────────────── */
     .preview-wrap {
       max-width: 420px; margin: 3.5rem auto 0;
       perspective: 1000px;
@@ -162,8 +171,7 @@
     .preview-card {
       background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 14px;
-      overflow: hidden;
+      border-radius: 14px; overflow: hidden;
       box-shadow: 0 32px 80px rgba(0,0,0,.55);
       transform: rotateX(4deg);
       transition: transform .3s;
@@ -177,88 +185,63 @@
       border-bottom: 1px solid var(--border);
       font-size: .78rem; color: var(--muted);
     }
-
-    .preview-titlebar .dot {
-      width: 10px; height: 10px; border-radius: 50%;
-    }
+    .preview-titlebar .dot { width: 10px; height: 10px; border-radius: 50%; }
 
     .preview-body { padding: 1rem; }
 
-    /* Mini toggle button */
     .mini-toggle {
-      border: 1.5px solid var(--blue);
-      border-radius: 10px;
+      border: 1.5px solid var(--blue); border-radius: 10px;
       padding: .9rem 1rem;
       display: flex; align-items: center; gap: 1rem;
       margin-bottom: .9rem;
       background: color-mix(in srgb, var(--blue) 5%, var(--card));
     }
-
     .mini-badge {
       width: 42px; height: 42px; border-radius: 50%;
       border: 1.5px solid var(--blue);
       background: color-mix(in srgb, var(--blue) 12%, transparent);
       display: flex; align-items: center; justify-content: center;
-      font-weight: 800; font-size: 1.1rem; color: var(--blue);
-      flex-shrink: 0;
+      font-weight: 800; font-size: 1.1rem; color: var(--blue); flex-shrink: 0;
     }
-
     .mini-info { flex: 1; }
     .mini-mode { font-weight: 700; font-size: 1rem; color: var(--blue); }
     .mini-sub  { font-size: .72rem; color: var(--muted); }
 
-    /* Mini device list */
     .mini-section-label {
-      font-size: .65rem; font-weight: 700; color: color-mix(in srgb, var(--blue) 60%, transparent);
+      font-size: .65rem; font-weight: 700;
+      color: color-mix(in srgb, var(--blue) 60%, transparent);
       letter-spacing: .08em; margin-bottom: .5rem;
     }
-
-    .mini-devices {
-      border: 1px solid var(--border);
-      border-radius: 8px; overflow: hidden;
-    }
-
+    .mini-devices { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
     .mini-device {
       display: flex; align-items: center; gap: .6rem;
-      padding: .45rem .7rem;
-      font-size: .75rem;
+      padding: .45rem .7rem; font-size: .75rem;
       border-bottom: 1px solid var(--dim);
     }
     .mini-device:last-child { border-bottom: none; }
-
-    .mini-dot {
-      width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
-    }
+    .mini-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 
     .mini-settings {
       margin-top: .9rem;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: .5rem .8rem;
+      border: 1px solid var(--border); border-radius: 8px; padding: .5rem .8rem;
     }
-
     .mini-row {
       display: flex; align-items: center; justify-content: space-between;
-      padding: .35rem 0;
-      font-size: .75rem; color: var(--text);
+      padding: .35rem 0; font-size: .75rem; color: var(--text);
       border-bottom: 1px solid var(--dim);
     }
     .mini-row:last-child { border-bottom: none; }
-
     .mini-switch {
       width: 28px; height: 16px; border-radius: 8px;
-      background: var(--blue);
-      position: relative; flex-shrink: 0;
+      background: var(--blue); position: relative; flex-shrink: 0;
     }
     .mini-switch::after {
-      content: '';
-      position: absolute;
-      right: 2px; top: 2px;
-      width: 12px; height: 12px; border-radius: 50%;
-      background: #fff;
+      content: ''; position: absolute;
+      right: 2px; top: 2px; width: 12px; height: 12px;
+      border-radius: 50%; background: #fff;
     }
 
-    /* ── Features ────────────────────────────────────────────────── */
+    /* ── Features ────────────────────────────────────── */
     section { max-width: 860px; margin: 0 auto; padding: 4rem 2rem; }
 
     .section-label {
@@ -267,76 +250,53 @@
       margin-bottom: .5rem;
     }
 
-    h2 {
-      font-size: 1.8rem; font-weight: 700; margin-bottom: 2rem;
-    }
+    h2 { font-size: 1.8rem; font-weight: 700; margin-bottom: 2rem; }
 
     .features-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
       gap: 1rem;
     }
-
     .feature-card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1.4rem;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 1.4rem;
       transition: border-color .2s, transform .2s;
     }
     .feature-card:hover {
       border-color: color-mix(in srgb, var(--blue) 50%, transparent);
       transform: translateY(-3px);
     }
-
-    .feature-icon {
-      font-size: 1.5rem; margin-bottom: .7rem;
-    }
-
+    .feature-icon { font-size: 1.5rem; margin-bottom: .7rem; }
     .feature-card h3 { font-size: .95rem; margin-bottom: .35rem; }
     .feature-card p  { font-size: .84rem; color: var(--muted); }
 
-    /* ── Download section ────────────────────────────────────────── */
+    /* ── Download ────────────────────────────────────── */
     .download-section {
       text-align: center;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 3rem 2rem;
-      margin: 0 2rem 4rem;
-      max-width: 860px;
-      margin-left: auto; margin-right: auto;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 16px; padding: 3rem 2rem;
+      max-width: 860px; margin: 0 auto;
     }
-
     .download-section h2 { margin-bottom: .5rem; }
     .download-section p  { color: var(--muted); margin-bottom: 2rem; }
 
-    .requirements {
-      display: flex; gap: 1rem; justify-content: center;
-      flex-wrap: wrap; margin-top: 1.5rem;
-    }
-
+    .requirements { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; margin-top: 1.5rem; }
     .req-pill {
       display: inline-flex; align-items: center; gap: .4rem;
-      padding: .3rem .9rem;
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      font-size: .8rem; color: var(--muted);
+      padding: .3rem .9rem; border: 1px solid var(--border);
+      border-radius: 999px; font-size: .8rem; color: var(--muted);
     }
 
-    /* ── Footer ──────────────────────────────────────────────────── */
+    /* ── Footer ──────────────────────────────────────── */
     footer {
-      text-align: center;
-      padding: 2rem;
+      text-align: center; padding: 2rem;
       border-top: 1px solid var(--border);
-      color: var(--muted);
-      font-size: .82rem;
+      color: var(--muted); font-size: .82rem;
+      margin-top: 4rem;
     }
-
     footer a { color: var(--blue); text-decoration: none; }
     footer a:hover { text-decoration: underline; }
 
-    /* ── Divider ─────────────────────────────────────────────────── */
     .divider {
       height: 1px;
       background: linear-gradient(90deg, transparent, var(--border), transparent);
@@ -346,7 +306,7 @@
 </head>
 <body>
 
-<!-- ── Nav ──────────────────────────────────────────────────────────── -->
+<!-- ── Nav ──────────────────────────────────────────────────────── -->
 <nav>
   <a href="#" class="nav-logo">
     <svg viewBox="0 0 26 26" fill="none">
@@ -357,28 +317,34 @@
     </svg>
     MonoStereoToggle
   </a>
-  <div class="nav-links">
-    <a href="#features">Features</a>
-    <a href="#download">Download</a>
-    <a href="https://github.com/samaBR85/MonoStereoToggle" target="_blank">GitHub</a>
+  <div class="nav-right">
+    <div class="nav-links">
+      <a href="#features" data-i18n="nav_features">Features</a>
+      <a href="#download" data-i18n="nav_download">Download</a>
+      <a href="https://github.com/samaBR85/MonoStereoToggle" target="_blank">GitHub</a>
+    </div>
+    <div class="lang-switcher">
+      <button class="lang-btn active" onclick="setLang('en')">EN</button>
+      <button class="lang-btn"        onclick="setLang('pt')">PT</button>
+    </div>
   </div>
 </nav>
 
-<!-- ── Hero ─────────────────────────────────────────────────────────── -->
+<!-- ── Hero ─────────────────────────────────────────────────────── -->
 <div class="hero">
   <div class="badge">v1.1 — Free &amp; Open Source</div>
-  <h1>Switch Windows Audio<br>Mono ↔ Stereo Instantly</h1>
-  <p>A lightweight Windows 11 utility to toggle your audio between Mono and Stereo — the same setting found in Windows Accessibility, now at your fingertips.</p>
+  <h1 data-i18n="hero_title">Switch Windows Audio<br>Mono ↔ Stereo Instantly</h1>
+  <p data-i18n="hero_sub">A lightweight Windows 11 utility to toggle your audio between Mono and Stereo — the same setting found in Windows Accessibility, now at your fingertips.</p>
   <div class="btn-group">
     <a href="https://github.com/samaBR85/MonoStereoToggle/releases/latest" class="btn btn-primary">
-      ⬇ Download .exe
+      ⬇ <span data-i18n="btn_download">Download .exe</span>
     </a>
     <a href="https://github.com/samaBR85/MonoStereoToggle" class="btn btn-outline">
-      View on GitHub
+      <span data-i18n="btn_github">View on GitHub</span>
     </a>
   </div>
 
-  <!-- App preview mockup -->
+  <!-- App mockup -->
   <div class="preview-wrap">
     <div class="preview-card">
       <div class="preview-titlebar">
@@ -386,43 +352,43 @@
         <div class="dot" style="background:#ffbd2e"></div>
         <div class="dot" style="background:#27c93f"></div>
         <span style="margin-left:.4rem">MonoStereoToggle</span>
-        <span style="margin-left:auto; background:color-mix(in srgb,#4a9eff 15%,transparent); border:1px solid color-mix(in srgb,#4a9eff 35%,transparent); color:#4a9eff; padding:.1rem .45rem; border-radius:4px; font-size:.68rem; font-weight:700">v1.1</span>
+        <span style="margin-left:auto;background:color-mix(in srgb,#4a9eff 15%,transparent);border:1px solid color-mix(in srgb,#4a9eff 35%,transparent);color:#4a9eff;padding:.1rem .45rem;border-radius:4px;font-size:.68rem;font-weight:700">v1.1</span>
       </div>
       <div class="preview-body">
         <div class="mini-toggle">
           <div class="mini-badge">M</div>
           <div class="mini-info">
             <div class="mini-mode">MONO</div>
-            <div class="mini-sub">Mono ativo — canais L+R mixados em um</div>
+            <div class="mini-sub" data-i18n="mock_mono_sub">Mono active — L+R channels mixed</div>
           </div>
           <span style="color:color-mix(in srgb,#4a9eff 40%,transparent);font-size:1.1rem">›</span>
         </div>
-        <div class="mini-section-label">DISPOSITIVOS DE SAÍDA DISPONÍVEIS ───────</div>
+        <div class="mini-section-label" data-i18n="mock_devices_label">AVAILABLE OUTPUT DEVICES ─────────</div>
         <div class="mini-devices">
           <div class="mini-device">
             <div class="mini-dot" style="background:#2dd28c"></div>
             <span style="color:#fff;font-weight:600">Headset (INZONE Buds)</span>
-            <span style="color:#2dd28c;font-size:.68rem;margin-left:.3rem">(padrão)</span>
+            <span style="color:#2dd28c;font-size:.68rem;margin-left:.3rem" data-i18n="mock_default">(default)</span>
           </div>
           <div class="mini-device">
             <div class="mini-dot" style="background:#303048"></div>
-            <span style="color:#5a5a6e">Saída Digital (Realtek)</span>
+            <span style="color:#5a5a6e">Digital Output (Realtek)</span>
           </div>
         </div>
         <div class="mini-settings">
           <div class="mini-row">
-            <span>Iniciar com o Windows</span>
+            <span data-i18n="mock_startup">Start with Windows</span>
             <div class="mini-switch"></div>
           </div>
           <div class="mini-row">
-            <span>Iniciar na bandeja do sistema</span>
+            <span data-i18n="mock_tray">Start minimized to tray</span>
             <div class="mini-switch"></div>
           </div>
           <div class="mini-row" style="border-bottom:none">
-            <span style="color:#5a5a6e">Atalho: Shift + Divide</span>
+            <span style="color:#5a5a6e"><span data-i18n="mock_shortcut_label">Shortcut:</span> Shift + Divide</span>
             <div style="display:flex;gap:.4rem">
-              <span style="font-size:.68rem;padding:.15rem .5rem;border:1px solid color-mix(in srgb,#4a9eff 40%,transparent);color:#4a9eff;border-radius:999px">Definir</span>
-              <span style="font-size:.68rem;padding:.15rem .5rem;border:1px solid color-mix(in srgb,#d24040 40%,transparent);color:#d24040;border-radius:999px">Limpar</span>
+              <span style="font-size:.68rem;padding:.15rem .5rem;border:1px solid color-mix(in srgb,#4a9eff 40%,transparent);color:#4a9eff;border-radius:999px" data-i18n="mock_set">Set</span>
+              <span style="font-size:.68rem;padding:.15rem .5rem;border:1px solid color-mix(in srgb,#d24040 40%,transparent);color:#d24040;border-radius:999px" data-i18n="mock_clear">Clear</span>
             </div>
           </div>
         </div>
@@ -431,77 +397,190 @@
   </div>
 </div>
 
-<!-- ── Features ──────────────────────────────────────────────────────── -->
+<!-- ── Features ──────────────────────────────────────────────────── -->
 <div class="divider"></div>
 <section id="features">
-  <div class="section-label">FEATURES</div>
-  <h2>Everything you need, nothing you don't</h2>
+  <div class="section-label" data-i18n="section_features">FEATURES</div>
+  <h2 data-i18n="features_title">Everything you need, nothing you don't</h2>
   <div class="features-grid">
     <div class="feature-card">
       <div class="feature-icon">🔊</div>
-      <h3>One-click toggle</h3>
-      <p>Switch between MONO and STEREO instantly — no menus, no Settings app.</p>
+      <h3 data-i18n="f1_title">One-click toggle</h3>
+      <p data-i18n="f1_desc">Switch between MONO and STEREO instantly — no menus, no Settings app.</p>
     </div>
     <div class="feature-card">
       <div class="feature-icon">⌨️</div>
-      <h3>Global shortcut</h3>
-      <p>Set a custom hotkey that works system-wide, even when the app is minimized.</p>
+      <h3 data-i18n="f2_title">Global shortcut</h3>
+      <p data-i18n="f2_desc">Set a custom hotkey that works system-wide, even when the app is minimized.</p>
     </div>
     <div class="feature-card">
       <div class="feature-icon">🖥️</div>
-      <h3>Visual overlay</h3>
-      <p>A sleek on-screen notification appears on toggle — works on any monitor.</p>
+      <h3 data-i18n="f3_title">Visual overlay</h3>
+      <p data-i18n="f3_desc">A sleek on-screen notification appears on toggle — works on any monitor.</p>
     </div>
     <div class="feature-card">
       <div class="feature-icon">🔔</div>
-      <h3>System tray</h3>
-      <p>Lives quietly in the tray, always visible. Right-click to toggle without opening the window.</p>
+      <h3 data-i18n="f4_title">System tray</h3>
+      <p data-i18n="f4_desc">Lives quietly in the tray. Right-click to toggle without opening the window.</p>
     </div>
     <div class="feature-card">
       <div class="feature-icon">🚀</div>
-      <h3>Auto-start</h3>
-      <p>Starts with Windows via Task Scheduler — no UAC prompt on login.</p>
+      <h3 data-i18n="f5_title">Auto-start</h3>
+      <p data-i18n="f5_desc">Starts with Windows via Task Scheduler — no UAC prompt on login.</p>
     </div>
     <div class="feature-card">
       <div class="feature-icon">🌍</div>
-      <h3>PT / EN</h3>
-      <p>Automatically follows your Windows display language — Portuguese or English.</p>
+      <h3 data-i18n="f6_title">PT / EN</h3>
+      <p data-i18n="f6_desc">Automatically follows your Windows display language — Portuguese or English.</p>
     </div>
   </div>
 </section>
 
-<!-- ── Download ───────────────────────────────────────────────────────── -->
+<!-- ── Download ───────────────────────────────────────────────────── -->
 <div class="divider"></div>
 <section id="download" style="padding-bottom:1rem">
   <div style="text-align:center">
-    <div class="section-label">DOWNLOAD</div>
+    <div class="section-label" data-i18n="section_download">DOWNLOAD</div>
   </div>
 </section>
 
-<div class="download-section">
-  <h2>Ready to use in seconds</h2>
-  <p>Single executable — no installer, no dependencies to manage.</p>
+<div class="download-section" style="margin-bottom:0">
+  <h2 data-i18n="dl_title">Ready to use in seconds</h2>
+  <p data-i18n="dl_sub">Single executable — no installer, no dependencies to manage.</p>
   <div class="btn-group">
     <a href="https://github.com/samaBR85/MonoStereoToggle/releases/latest" class="btn btn-primary" style="font-size:1.05rem;padding:.85rem 2.2rem">
-      ⬇ Download MonoStereoToggle.exe
+      ⬇ <span data-i18n="dl_btn">Download MonoStereoToggle.exe</span>
     </a>
   </div>
   <div class="requirements">
     <span class="req-pill">🪟 Windows 11</span>
     <span class="req-pill">⚙️ .NET 8 Runtime (x64)</span>
-    <span class="req-pill">🛡️ Requires administrator</span>
+    <span class="req-pill" data-i18n="req_admin">🛡️ Requires administrator</span>
     <span class="req-pill">📦 ~500 KB</span>
   </div>
 </div>
 
-<!-- ── Footer ─────────────────────────────────────────────────────────── -->
+<!-- ── Footer ─────────────────────────────────────────────────────── -->
 <footer>
   <p>
-    Made with ♥ by <a href="https://github.com/samaBR85">samaBR</a> ·
+    <span data-i18n="footer_made">Made with ♥ by</span>
+    <a href="https://github.com/samaBR85">samaBR</a> ·
     <a href="https://github.com/samaBR85/MonoStereoToggle">GitHub</a> ·
     <a href="https://github.com/samaBR85/MonoStereoToggle/blob/main/LICENSE">MIT License</a>
   </p>
 </footer>
+
+<!-- ── i18n ───────────────────────────────────────────────────────── -->
+<script>
+const translations = {
+  en: {
+    nav_features:      "Features",
+    nav_download:      "Download",
+    hero_title:        "Switch Windows Audio<br>Mono ↔ Stereo Instantly",
+    hero_sub:          "A lightweight Windows 11 utility to toggle your audio between Mono and Stereo — the same setting found in Windows Accessibility, now at your fingertips.",
+    btn_download:      "Download .exe",
+    btn_github:        "View on GitHub",
+    mock_mono_sub:     "Mono active — L+R channels mixed",
+    mock_devices_label:"AVAILABLE OUTPUT DEVICES ─────────",
+    mock_default:      "(default)",
+    mock_startup:      "Start with Windows",
+    mock_tray:         "Start minimized to tray",
+    mock_shortcut_label:"Shortcut:",
+    mock_set:          "Set",
+    mock_clear:        "Clear",
+    section_features:  "FEATURES",
+    features_title:    "Everything you need, nothing you don't",
+    f1_title: "One-click toggle",
+    f1_desc:  "Switch between MONO and STEREO instantly — no menus, no Settings app.",
+    f2_title: "Global shortcut",
+    f2_desc:  "Set a custom hotkey that works system-wide, even when the app is minimized.",
+    f3_title: "Visual overlay",
+    f3_desc:  "A sleek on-screen notification appears on toggle — works on any monitor.",
+    f4_title: "System tray",
+    f4_desc:  "Lives quietly in the tray. Right-click to toggle without opening the window.",
+    f5_title: "Auto-start",
+    f5_desc:  "Starts with Windows via Task Scheduler — no UAC prompt on login.",
+    f6_title: "PT / EN",
+    f6_desc:  "Automatically follows your Windows display language — Portuguese or English.",
+    section_download:  "DOWNLOAD",
+    dl_title: "Ready to use in seconds",
+    dl_sub:   "Single executable — no installer, no dependencies to manage.",
+    dl_btn:   "Download MonoStereoToggle.exe",
+    req_admin:"🛡️ Requires administrator",
+    footer_made: "Made with ♥ by",
+    // mockup device name (the second row)
+    mock_device2: "Digital Output (Realtek)",
+  },
+  pt: {
+    nav_features:      "Funcionalidades",
+    nav_download:      "Download",
+    hero_title:        "Alterne o Áudio do Windows<br>Mono ↔ Estéreo na Hora",
+    hero_sub:          "Um utilitário leve para Windows 11 que alterna o áudio entre Mono e Estéreo — a mesma configuração encontrada em Acessibilidade do Windows, agora ao alcance de um clique.",
+    btn_download:      "Baixar .exe",
+    btn_github:        "Ver no GitHub",
+    mock_mono_sub:     "Mono ativo — canais L+R mixados em um",
+    mock_devices_label:"DISPOSITIVOS DE SAÍDA DISPONÍVEIS ───",
+    mock_default:      "(padrão)",
+    mock_startup:      "Iniciar com o Windows",
+    mock_tray:         "Iniciar na bandeja do sistema",
+    mock_shortcut_label:"Atalho:",
+    mock_set:          "Definir",
+    mock_clear:        "Limpar",
+    section_features:  "FUNCIONALIDADES",
+    features_title:    "Tudo que você precisa, nada a mais",
+    f1_title: "Alternância com um clique",
+    f1_desc:  "Alterne entre MONO e ESTÉREO instantaneamente — sem menus, sem app de Configurações.",
+    f2_title: "Atalho global",
+    f2_desc:  "Defina um atalho de teclado que funciona em qualquer lugar, mesmo com o app minimizado.",
+    f3_title: "Overlay visual",
+    f3_desc:  "Uma notificação discreta aparece na tela ao alternar — funciona em qualquer monitor.",
+    f4_title: "Bandeja do sistema",
+    f4_desc:  "Fica na bandeja silenciosamente. Clique direito para alternar sem abrir a janela.",
+    f5_title: "Inicialização automática",
+    f5_desc:  "Inicia com o Windows via Agendador de Tarefas — sem prompt do UAC no login.",
+    f6_title: "PT / EN",
+    f6_desc:  "Segue automaticamente o idioma do seu Windows — Português ou Inglês.",
+    section_download:  "DOWNLOAD",
+    dl_title: "Pronto para usar em segundos",
+    dl_sub:   "Um único executável — sem instalador, sem dependências para gerenciar.",
+    dl_btn:   "Baixar MonoStereoToggle.exe",
+    req_admin:"🛡️ Requer administrador",
+    footer_made: "Feito com ♥ por",
+    mock_device2: "Saída Digital (Realtek)",
+  }
+};
+
+let currentLang = (navigator.language || 'en').startsWith('pt') ? 'pt' : 'en';
+
+function setLang(lang) {
+  currentLang = lang;
+  const t = translations[lang];
+
+  // Update all data-i18n elements
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (t[key] !== undefined) el.innerHTML = t[key];
+  });
+
+  // Update second device row (no data-i18n since it has no wrapper span)
+  const deviceRows = document.querySelectorAll('.mini-device');
+  if (deviceRows[1]) {
+    const span = deviceRows[1].querySelector('span');
+    if (span) span.textContent = t.mock_device2;
+  }
+
+  // Toggle active button
+  document.querySelectorAll('.lang-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.textContent === lang.toUpperCase());
+  });
+
+  // Update html lang attribute
+  document.documentElement.lang = lang;
+}
+
+// Apply on load
+setLang(currentLang);
+</script>
 
 </body>
 </html>
