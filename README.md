@@ -7,6 +7,8 @@ A lightweight Windows 11 utility to instantly switch your audio output between *
 ![Platform](https://img.shields.io/badge/platform-Windows%2011-blue)
 ![Language](https://img.shields.io/badge/language-C%23-green)
 
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/E5N7227AO5)
+
 ---
 
 ## Features
