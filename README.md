@@ -26,7 +26,7 @@ A lightweight Windows 11 utility to instantly switch your audio output between *
 
 ## Download
 
-👉 **[Latest Release](https://github.com/samaBR85/MonoStereoToggle/releases/latest)**
+👉 **Latest Release** — available under the *Releases* tab of this repository.
 
 Download `MonoStereoToggle.exe` — no installation required.
 
