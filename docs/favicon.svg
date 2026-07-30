@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Background circle -->
+  <circle cx="16" cy="16" r="15" fill="#1a1a2e"/>
+  <!-- Speaker icon -->
+  <rect x="7" y="12" width="5" height="8" rx="1" fill="#4fc3f7"/>
+  <path d="M12 10 L17 7 L17 25 L12 22 Z" fill="#4fc3f7"/>
+  <!-- Stereo wave right -->
+  <path d="M19 12 Q22 16 19 20" stroke="#4fc3f7" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+  <!-- Mono wave (inner) -->
+  <path d="M21 13.5 Q24 16 21 18.5" stroke="#81d4fa" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+</svg>
